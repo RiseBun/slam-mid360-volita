@@ -213,6 +213,7 @@ ros2 bag play /path/to/your/rosbag --rate 1.0
 ### 方式三：GUI 控制面板
 
 ```bash
+cd slam-mid360-volita
 python3 src/adaptive_lio/scripts/gui_launcher.py
 ```
 
