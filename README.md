@@ -54,21 +54,7 @@
 
 ```bash
 # 设置 locale
-sudo apt update && sudo apt install locales
-sudo locale-gen en_US en_US.UTF-8
-sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-export LANG=en_US.UTF-8
-
-# 添加 ROS2 源
-sudo apt install software-properties-common
-sudo add-apt-repository universe
-sudo apt update && sudo apt install curl -y
-sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-
-# 安装 ROS2 Humble
-sudo apt update
-sudo apt install ros-humble-desktop ros-humble-pcl-ros ros-dev-tools -y
+请县
 
 # 配置环境
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
@@ -173,7 +159,7 @@ sudo apt install -y \
 ```bash
 # 克隆项目
 cd ~
-git clone https://github.com/YOUR_USERNAME/slam-mid360-volita.git
+git clone https://github.com/RiseBun/slam-mid360-volita.git
 cd slam-mid360-volita
 
 # 编译
