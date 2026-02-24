@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-BSD--3--Clause-green)](LICENSE)
 
 ---
-### 注意！！！：orin或开发板一定要配置swap，可以把型号发给ai，选择最大最优值，然后用类似free -h检验一下是否配置成功
+# 注意！！！：orin或开发板一定要配置swap，可以把型号发给ai，选择最大最优值，然后用类似free -h检验一下是否配置成功
 
 ## 功能特点
 
