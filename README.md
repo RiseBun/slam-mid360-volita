@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/License-BSD--3--Clause-green)](LICENSE)
 
 ---
+### 注意：orin或开发板一定要配置swap，可以把型号发给ai，选择最大最优值，然后检验一下是否配置成功
 
 ## 功能特点
 
@@ -54,7 +55,7 @@
 
 ```bash
 # 设置 locale
-请县
+请先安装ros2 humble
 
 # 配置环境
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
@@ -68,9 +69,10 @@ source ~/.bashrc
 ```bash
 cd ~
 git clone https://github.com/Livox-SDK/Livox-SDK2.git
-cd Livox-SDK2
-mkdir build && cd build
-cmake .. && make -j$(nproc)
+cd ./Livox-SDK2/
+mkdir build
+cd build
+cmake .. && make -j
 sudo make install
 ```
 
@@ -81,15 +83,9 @@ sudo make install
 mkdir -p ~/livox_ws/src
 cd ~/livox_ws/src
 git clone https://github.com/Livox-SDK/livox_ros_driver2.git
-
-# 编译
-cd ~/livox_ws
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install
-
-# 配置环境 (添加到 ~/.bashrc)
-echo "source ~/livox_ws/install/setup.bash" >> ~/.bashrc
-source ~/.bashrc
+cd ~/livox_ws/src/livox_ros_driver2
+source /opt/ros/humble/setup.sh
+./build.sh humble
 ```
 
 #### 2.3 配置 MID-360
