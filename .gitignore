@@ -1,0 +1,26 @@
+# Build
+build/
+install/
+log/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Map outputs (user generated)
+map/*.pcd
+
+# Log files
+log/*.txt
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
