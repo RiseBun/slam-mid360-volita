@@ -1,0 +1,377 @@
+[0.000000] (-) TimerEvent: {}
+[0.000167] (adaptive_lio) JobQueued: {'identifier': 'adaptive_lio', 'dependencies': OrderedDict()}
+[0.000496] (adaptive_lio) JobStarted: {'identifier': 'adaptive_lio'}
+[0.005427] (adaptive_lio) JobProgress: {'identifier': 'adaptive_lio', 'progress': 'cmake'}
+[0.006026] (adaptive_lio) JobProgress: {'identifier': 'adaptive_lio', 'progress': 'build'}
+[0.006592] (adaptive_lio) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio', '--', '-j20', '-l20'], 'cwd': '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio', 'env': OrderedDict([('GJS_DEBUG_TOPICS', 'JS ERROR;JS LOG'), ('VSCODE_CWD', '/home/pace2204'), ('LANGUAGE', 'zh_CN:zh'), ('USER', 'pace2204'), ('VSCODE_NLS_CONFIG', '{"userLocale":"zh-cn","osLocale":"en","resolvedLanguage":"zh-cn","defaultMessagesFile":"/usr/share/qoder/resources/app/out/nls.messages.json","languagePack":{"translationsConfigFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/tcf.json","messagesFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/0.4.7_ba2c98a811c6e5222a3d7f07e51e5b512cf9e403/nls.messages.json","corruptMarkerFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/corrupted.info"},"locale":"zh-cn","availableLanguages":{"*":"zh-cn"},"_languagePackId":"3afffd5016528ded1c796a08d125a4d5.zh-cn","_languagePackSupport":true,"_translationsConfigFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/tcf.json","_cacheRoot":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn","_resolvedLanguagePackCoreLocation":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/0.4.7_ba2c98a811c6e5222a3d7f07e51e5b512cf9e403","_corruptedFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/corrupted.info"}'), ('GIT_EDITOR', 'true'), ('XDG_SESSION_TYPE', 'wayland'), ('SHLVL', '1'), ('LD_LIBRARY_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib'), ('HOME', '/home/pace2204'), ('CHROME_DESKTOP', 'qoder.desktop'), ('OLDPWD', '/home/pace2204/copy/slam-mid360-volita'), ('DESKTOP_SESSION', 'ubuntu'), ('VSCODE_IPC_HOOK', '/run/user/1000/vscode-415d8430-1.10-main.sock'), ('GIO_LAUNCHED_DESKTOP_FILE', '/usr/share/applications/qoder.desktop'), ('ROS_PYTHON_VERSION', '3'), ('GNOME_SHELL_SESSION_MODE', 'ubuntu'), ('GTK_MODULES', 'gail:atk-bridge'), ('MANAGERPID', '1055'), ('SYSTEMD_EXEC_PID', '1291'), ('IM_CONFIG_CHECK_ENV', '1'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('QODERCLI_INTEGRATION_MODE', 'quest'), ('GIO_LAUNCHED_DESKTOP_FILE_PID', '375435'), ('IM_CONFIG_PHASE', '1'), ('WAYLAND_DISPLAY', 'wayland-0'), ('COLCON_PREFIX_PATH', '/home/pace2204/livox_ws/install'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'pace2204'), ('JOURNAL_STREAM', '8:17332'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('XDG_SESSION_CLASS', 'user'), ('TYPE_IS_ARMS', 'true'), ('USERNAME', 'pace2204'), ('GNOME_DESKTOP_SESSION_ID', 'this-is-deprecated'), ('ROS_LOCALHOST_ONLY', '0'), ('VSCODE_BRAND', 'Qoder'), ('PATH', '/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'), ('SESSION_MANAGER', 'local/pace2204-BQM5:@/tmp/.ICE-unix/1245,unix/pace2204-BQM5:/tmp/.ICE-unix/1245'), ('INVOCATION_ID', '24b5279f95ef46a895d7ed97825347e4'), ('XDG_MENU_PREFIX', 'gnome-'), ('GNOME_SETUP_DISPLAY', ':1'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('GDK_BACKEND', 'x11'), ('ARMS_APP_NAME', 'qoder-cosy'), ('DISPLAY', ':0'), ('ARMS_REGION_ID', 'ap-northeast-1'), ('LANG', 'zh_CN.UTF-8'), ('XDG_CURRENT_DESKTOP', 'Unity'), ('XMODIFIERS', '@im=ibus'), ('XDG_SESSION_DESKTOP', 'ubuntu'), ('XAUTHORITY', '/run/user/1000/.mutter-Xwaylandauth.3YDOL3'), ('SSH_AGENT_LAUNCHER', 'gnome-keyring'), ('SSH_AUTH_SOCK', '/run/user/1000/keyring/ssh'), ('AMENT_PREFIX_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2:/opt/ros/humble'), ('ORIGINAL_XDG_CURRENT_DESKTOP', 'ubuntu:GNOME'), ('SHELL', '/bin/bash'), ('QT_ACCESSIBILITY', '1'), ('NO_AT_BRIDGE', '1'), ('GDMSESSION', 'ubuntu'), ('GJS_DEBUG_OUTPUT', 'stderr'), ('ARMS_ENABLE', 'true'), ('QT_IM_MODULE', 'ibus'), ('PWD', '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio'), ('XDG_CONFIG_DIRS', '/etc/xdg/xdg-ubuntu:/etc/xdg'), ('VSCODE_CODE_CACHE_PATH', '/home/pace2204/.config/Qoder/CachedData/ba2c98a811c6e5222a3d7f07e51e5b512cf9e403'), ('XDG_DATA_DIRS', '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/pace2204/livox_ws/install/livox_ros_driver2/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('QODER_CLI', '1'), ('COLCON', '1'), ('FEATURE_FLAGS', '{"authUserPlanTierName":true,"welcomeFirstLaunchKey":"qoder.firstLaunch","welcomeOnboardingUseCustomStyle":false,"questModeEnable":true,"repoWikiEnable":true,"codebaseIgnoreFileName":".qoderignore","chatDefaultMode":"agent","chatDefaultAskModeUseTools":true,"currentPlanTitleKey":"application.config.general.plan.currentPlan.title","enableCreditUsage":true,"hasDedicatedUrlSetting":false,"showWelcomeMessage":false,"showModelTierSelector":true,"showModelSelector":false,"landingPageNeedLoginBtn":true,"preferredLanguageSupportOnlyZhAndEn":false,"enableSecurityFilter":false,"enableCodeChanges":false,"enableGitCommit":false,"enableLocalFile":true,"enableUserPlanUpgrade":true,"defaultBigModelEndpoint":"https://center.qoder.sh","improvementPlanSetting":true,"supportOrganizationCommand":false,"enableDynamicConfig":true,"qoderDirectAuth":true,"feedbackMethodIsEmail":true,"commit":"ba2c98a811c6e5222a3d7f07e51e5b512cf9e403","date":"2026-02-13T07:13:54.052Z","checksums":{"vs/base/parts/sandbox/electron-sandbox/preload.js":"eMCMtyPVVMxe6uce3NknivMZgd2q6ljQPMr7vRScAYk","vs/workbench/workbench.desktop.main.js":"SXd9pOwo55Yt83OEiXFoPAZHye0pnQIrxbQ70O+Sed0","vs/workbench/workbench.desktop.main.css":"ks0fu1idwMDL7fIcSu1ifhgVpKdkCZziL+7TE1Yc0eo","vs/workbench/api/node/extensionHostProcess.js":"O9uuxViaBomQawTGz+iPBQciGCUSdznm4hYtj/4ed0E","vs/code/electron-sandbox/workbench/workbench.html":"qCUV1BYtmJSS5BrtctLLLnPUm3g0BF+THziYLDg2hCo","vs/code/electron-sandbox/workbench/workbench.js":"HTzPHXSSGaB8b0ToK7BcL04+DQWpVjGgEPRXhP7jxW4"},"version":"0.4.7"}'), ('CMAKE_PREFIX_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2:/opt/ros/humble'), ('VSCODE_PID', '375435')]), 'shell': False}
+[0.082370] (adaptive_lio) StdoutLine: {'line': b'[ 40%] Built target adaptive_lio.common\n'}
+[0.087130] (adaptive_lio) StdoutLine: {'line': b'[ 50%] Built target adaptive_lio.pre\n'}
+[0.099943] (-) TimerEvent: {}
+[0.131043] (adaptive_lio) StdoutLine: {'line': b'[ 60%] Built target adaptive_lio.algo\n'}
+[0.191569] (adaptive_lio) StdoutLine: {'line': b'[ 85%] Built target adaptive_lio.lio\n'}
+[0.200029] (-) TimerEvent: {}
+[0.244237] (adaptive_lio) StdoutLine: {'line': b'[ 90%] Building CXX object CMakeFiles/adaptive_lio_node.dir/src/apps/main_ros2.cpp.o\n'}
+[0.300212] (-) TimerEvent: {}
+[0.400473] (-) TimerEvent: {}
+[0.500623] (-) TimerEvent: {}
+[0.600773] (-) TimerEvent: {}
+[0.700934] (-) TimerEvent: {}
+[0.801184] (-) TimerEvent: {}
+[0.901355] (-) TimerEvent: {}
+[1.001529] (-) TimerEvent: {}
+[1.101699] (-) TimerEvent: {}
+[1.201859] (-) TimerEvent: {}
+[1.302020] (-) TimerEvent: {}
+[1.402181] (-) TimerEvent: {}
+[1.502344] (-) TimerEvent: {}
+[1.602511] (-) TimerEvent: {}
+[1.702674] (-) TimerEvent: {}
+[1.802854] (-) TimerEvent: {}
+[1.903049] (-) TimerEvent: {}
+[2.003233] (-) TimerEvent: {}
+[2.103422] (-) TimerEvent: {}
+[2.203625] (-) TimerEvent: {}
+[2.303839] (-) TimerEvent: {}
+[2.404054] (-) TimerEvent: {}
+[2.504241] (-) TimerEvent: {}
+[2.604398] (-) TimerEvent: {}
+[2.704553] (-) TimerEvent: {}
+[2.804735] (-) TimerEvent: {}
+[2.904912] (-) TimerEvent: {}
+[3.005077] (-) TimerEvent: {}
+[3.105244] (-) TimerEvent: {}
+[3.205410] (-) TimerEvent: {}
+[3.305588] (-) TimerEvent: {}
+[3.405768] (-) TimerEvent: {}
+[3.505948] (-) TimerEvent: {}
+[3.606115] (-) TimerEvent: {}
+[3.706296] (-) TimerEvent: {}
+[3.806504] (-) TimerEvent: {}
+[3.906692] (-) TimerEvent: {}
+[4.006828] (-) TimerEvent: {}
+[4.106952] (-) TimerEvent: {}
+[4.207106] (-) TimerEvent: {}
+[4.307276] (-) TimerEvent: {}
+[4.407444] (-) TimerEvent: {}
+[4.507600] (-) TimerEvent: {}
+[4.607763] (-) TimerEvent: {}
+[4.707949] (-) TimerEvent: {}
+[4.808132] (-) TimerEvent: {}
+[4.908306] (-) TimerEvent: {}
+[5.008465] (-) TimerEvent: {}
+[5.108706] (-) TimerEvent: {}
+[5.208981] (-) TimerEvent: {}
+[5.309117] (-) TimerEvent: {}
+[5.409230] (-) TimerEvent: {}
+[5.509335] (-) TimerEvent: {}
+[5.609455] (-) TimerEvent: {}
+[5.709610] (-) TimerEvent: {}
+[5.809731] (-) TimerEvent: {}
+[5.909847] (-) TimerEvent: {}
+[6.009967] (-) TimerEvent: {}
+[6.110097] (-) TimerEvent: {}
+[6.210262] (-) TimerEvent: {}
+[6.310408] (-) TimerEvent: {}
+[6.410543] (-) TimerEvent: {}
+[6.510695] (-) TimerEvent: {}
+[6.610826] (-) TimerEvent: {}
+[6.710917] (-) TimerEvent: {}
+[6.811000] (-) TimerEvent: {}
+[6.911081] (-) TimerEvent: {}
+[7.011185] (-) TimerEvent: {}
+[7.111335] (-) TimerEvent: {}
+[7.211505] (-) TimerEvent: {}
+[7.311670] (-) TimerEvent: {}
+[7.411851] (-) TimerEvent: {}
+[7.512017] (-) TimerEvent: {}
+[7.612157] (-) TimerEvent: {}
+[7.712267] (-) TimerEvent: {}
+[7.812351] (-) TimerEvent: {}
+[7.912449] (-) TimerEvent: {}
+[8.012539] (-) TimerEvent: {}
+[8.112646] (-) TimerEvent: {}
+[8.212795] (-) TimerEvent: {}
+[8.312961] (-) TimerEvent: {}
+[8.413135] (-) TimerEvent: {}
+[8.513295] (-) TimerEvent: {}
+[8.613445] (-) TimerEvent: {}
+[8.713596] (-) TimerEvent: {}
+[8.813751] (-) TimerEvent: {}
+[8.913900] (-) TimerEvent: {}
+[9.014028] (-) TimerEvent: {}
+[9.114268] (-) TimerEvent: {}
+[9.214423] (-) TimerEvent: {}
+[9.314581] (-) TimerEvent: {}
+[9.414744] (-) TimerEvent: {}
+[9.514915] (-) TimerEvent: {}
+[9.615074] (-) TimerEvent: {}
+[9.715232] (-) TimerEvent: {}
+[9.815395] (-) TimerEvent: {}
+[9.915540] (-) TimerEvent: {}
+[10.015681] (-) TimerEvent: {}
+[10.115846] (-) TimerEvent: {}
+[10.215967] (-) TimerEvent: {}
+[10.316088] (-) TimerEvent: {}
+[10.416242] (-) TimerEvent: {}
+[10.516394] (-) TimerEvent: {}
+[10.616531] (-) TimerEvent: {}
+[10.716628] (-) TimerEvent: {}
+[10.816745] (-) TimerEvent: {}
+[10.916897] (-) TimerEvent: {}
+[11.017050] (-) TimerEvent: {}
+[11.117192] (-) TimerEvent: {}
+[11.217308] (-) TimerEvent: {}
+[11.317436] (-) TimerEvent: {}
+[11.417589] (-) TimerEvent: {}
+[11.517711] (-) TimerEvent: {}
+[11.617799] (-) TimerEvent: {}
+[11.717886] (-) TimerEvent: {}
+[11.817965] (-) TimerEvent: {}
+[11.918075] (-) TimerEvent: {}
+[12.018209] (-) TimerEvent: {}
+[12.118315] (-) TimerEvent: {}
+[12.218433] (-) TimerEvent: {}
+[12.318587] (-) TimerEvent: {}
+[12.418741] (-) TimerEvent: {}
+[12.518895] (-) TimerEvent: {}
+[12.619049] (-) TimerEvent: {}
+[12.719210] (-) TimerEvent: {}
+[12.819369] (-) TimerEvent: {}
+[12.919526] (-) TimerEvent: {}
+[13.019647] (-) TimerEvent: {}
+[13.119738] (-) TimerEvent: {}
+[13.219862] (-) TimerEvent: {}
+[13.320018] (-) TimerEvent: {}
+[13.420176] (-) TimerEvent: {}
+[13.520330] (-) TimerEvent: {}
+[13.620485] (-) TimerEvent: {}
+[13.720642] (-) TimerEvent: {}
+[13.820795] (-) TimerEvent: {}
+[13.920959] (-) TimerEvent: {}
+[14.021082] (-) TimerEvent: {}
+[14.121198] (-) TimerEvent: {}
+[14.221352] (-) TimerEvent: {}
+[14.321479] (-) TimerEvent: {}
+[14.421569] (-) TimerEvent: {}
+[14.521645] (-) TimerEvent: {}
+[14.621721] (-) TimerEvent: {}
+[14.721844] (-) TimerEvent: {}
+[14.822005] (-) TimerEvent: {}
+[14.922170] (-) TimerEvent: {}
+[15.022327] (-) TimerEvent: {}
+[15.122485] (-) TimerEvent: {}
+[15.222656] (-) TimerEvent: {}
+[15.322838] (-) TimerEvent: {}
+[15.423018] (-) TimerEvent: {}
+[15.523197] (-) TimerEvent: {}
+[15.623371] (-) TimerEvent: {}
+[15.723502] (-) TimerEvent: {}
+[15.823636] (-) TimerEvent: {}
+[15.923823] (-) TimerEvent: {}
+[16.023995] (-) TimerEvent: {}
+[16.124121] (-) TimerEvent: {}
+[16.224245] (-) TimerEvent: {}
+[16.324413] (-) TimerEvent: {}
+[16.424586] (-) TimerEvent: {}
+[16.524755] (-) TimerEvent: {}
+[16.624949] (-) TimerEvent: {}
+[16.725081] (-) TimerEvent: {}
+[16.825211] (-) TimerEvent: {}
+[16.925379] (-) TimerEvent: {}
+[17.025504] (-) TimerEvent: {}
+[17.125631] (-) TimerEvent: {}
+[17.225774] (-) TimerEvent: {}
+[17.325903] (-) TimerEvent: {}
+[17.426070] (-) TimerEvent: {}
+[17.526232] (-) TimerEvent: {}
+[17.626393] (-) TimerEvent: {}
+[17.726552] (-) TimerEvent: {}
+[17.826718] (-) TimerEvent: {}
+[17.926877] (-) TimerEvent: {}
+[18.027037] (-) TimerEvent: {}
+[18.127195] (-) TimerEvent: {}
+[18.227346] (-) TimerEvent: {}
+[18.327500] (-) TimerEvent: {}
+[18.427672] (-) TimerEvent: {}
+[18.527842] (-) TimerEvent: {}
+[18.628000] (-) TimerEvent: {}
+[18.728163] (-) TimerEvent: {}
+[18.828316] (-) TimerEvent: {}
+[18.928475] (-) TimerEvent: {}
+[19.028640] (-) TimerEvent: {}
+[19.128791] (-) TimerEvent: {}
+[19.228992] (-) TimerEvent: {}
+[19.254516] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In destructor \xe2\x80\x98AdaptiveLioNode::~AdaptiveLioNode()\xe2\x80\x99:\n'}
+[19.254839] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:288:23: warning: ignoring return value of \xe2\x80\x98int system(const char*)\xe2\x80\x99 declared with attribute \xe2\x80\x98warn_unused_result\xe2\x80\x99 [-Wunused-result]\n'}
+[19.254964] (adaptive_lio) StderrLine: {'line': b'  288 |                 system(cmd.c_str());\n'}
+[19.255058] (adaptive_lio) StderrLine: {'line': b'      |                 ~~~~~~^~~~~~~~~~~~~\n'}
+[19.329072] (-) TimerEvent: {}
+[19.429216] (-) TimerEvent: {}
+[19.529338] (-) TimerEvent: {}
+[19.600158] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:\n'}
+[19.600285] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:694:19: warning: ignoring return value of \xe2\x80\x98int system(const char*)\xe2\x80\x99 declared with attribute \xe2\x80\x98warn_unused_result\xe2\x80\x99 [-Wunused-result]\n'}
+[19.600326] (adaptive_lio) StderrLine: {'line': b'  694 |             system(cmd.c_str());\n'}
+[19.600358] (adaptive_lio) StderrLine: {'line': b'      |             ~~~~~~^~~~~~~~~~~~~\n'}
+[19.601166] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:\n'}
+[19.601203] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:773:19: warning: ignoring return value of \xe2\x80\x98int system(const char*)\xe2\x80\x99 declared with attribute \xe2\x80\x98warn_unused_result\xe2\x80\x99 [-Wunused-result]\n'}
+[19.601236] (adaptive_lio) StderrLine: {'line': b'  773 |             system(cmd.c_str());\n'}
+[19.601263] (adaptive_lio) StderrLine: {'line': b'      |             ~~~~~~^~~~~~~~~~~~~\n'}
+[19.602999] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In member function \xe2\x80\x98void AdaptiveLioNode::saveMapCallback(std::shared_ptr<std_srvs::srv::Trigger_Request_<std::allocator<void> > >, std::shared_ptr<std_srvs::srv::Trigger_Response_<std::allocator<void> > >)\xe2\x80\x99:\n'}
+[19.603034] (adaptive_lio) StderrLine: {'line': b'/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:613:23: warning: ignoring return value of \xe2\x80\x98int system(const char*)\xe2\x80\x99 declared with attribute \xe2\x80\x98warn_unused_result\xe2\x80\x99 [-Wunused-result]\n'}
+[19.603063] (adaptive_lio) StderrLine: {'line': b'  613 |                 system(cmd.c_str());\n'}
+[19.603090] (adaptive_lio) StderrLine: {'line': b'      |                 ~~~~~~^~~~~~~~~~~~~\n'}
+[19.629432] (-) TimerEvent: {}
+[19.729616] (-) TimerEvent: {}
+[19.829830] (-) TimerEvent: {}
+[19.929994] (-) TimerEvent: {}
+[20.030122] (-) TimerEvent: {}
+[20.130244] (-) TimerEvent: {}
+[20.230404] (-) TimerEvent: {}
+[20.330562] (-) TimerEvent: {}
+[20.430716] (-) TimerEvent: {}
+[20.530868] (-) TimerEvent: {}
+[20.631060] (-) TimerEvent: {}
+[20.731236] (-) TimerEvent: {}
+[20.831391] (-) TimerEvent: {}
+[20.931547] (-) TimerEvent: {}
+[21.031709] (-) TimerEvent: {}
+[21.131872] (-) TimerEvent: {}
+[21.232032] (-) TimerEvent: {}
+[21.332186] (-) TimerEvent: {}
+[21.432339] (-) TimerEvent: {}
+[21.532491] (-) TimerEvent: {}
+[21.632645] (-) TimerEvent: {}
+[21.732802] (-) TimerEvent: {}
+[21.832973] (-) TimerEvent: {}
+[21.933137] (-) TimerEvent: {}
+[22.033277] (-) TimerEvent: {}
+[22.133418] (-) TimerEvent: {}
+[22.233558] (-) TimerEvent: {}
+[22.333698] (-) TimerEvent: {}
+[22.433832] (-) TimerEvent: {}
+[22.533933] (-) TimerEvent: {}
+[22.634014] (-) TimerEvent: {}
+[22.734140] (-) TimerEvent: {}
+[22.834302] (-) TimerEvent: {}
+[22.934452] (-) TimerEvent: {}
+[23.034600] (-) TimerEvent: {}
+[23.134726] (-) TimerEvent: {}
+[23.234860] (-) TimerEvent: {}
+[23.335004] (-) TimerEvent: {}
+[23.435149] (-) TimerEvent: {}
+[23.535304] (-) TimerEvent: {}
+[23.635452] (-) TimerEvent: {}
+[23.735601] (-) TimerEvent: {}
+[23.835786] (-) TimerEvent: {}
+[23.936013] (-) TimerEvent: {}
+[24.036158] (-) TimerEvent: {}
+[24.136300] (-) TimerEvent: {}
+[24.236448] (-) TimerEvent: {}
+[24.336605] (-) TimerEvent: {}
+[24.436751] (-) TimerEvent: {}
+[24.536896] (-) TimerEvent: {}
+[24.637041] (-) TimerEvent: {}
+[24.737190] (-) TimerEvent: {}
+[24.837332] (-) TimerEvent: {}
+[24.937478] (-) TimerEvent: {}
+[25.037624] (-) TimerEvent: {}
+[25.137769] (-) TimerEvent: {}
+[25.237902] (-) TimerEvent: {}
+[25.338024] (-) TimerEvent: {}
+[25.438176] (-) TimerEvent: {}
+[25.538330] (-) TimerEvent: {}
+[25.638478] (-) TimerEvent: {}
+[25.738628] (-) TimerEvent: {}
+[25.838777] (-) TimerEvent: {}
+[25.938936] (-) TimerEvent: {}
+[26.039097] (-) TimerEvent: {}
+[26.139249] (-) TimerEvent: {}
+[26.239398] (-) TimerEvent: {}
+[26.339553] (-) TimerEvent: {}
+[26.439709] (-) TimerEvent: {}
+[26.539856] (-) TimerEvent: {}
+[26.640009] (-) TimerEvent: {}
+[26.740157] (-) TimerEvent: {}
+[26.840321] (-) TimerEvent: {}
+[26.940485] (-) TimerEvent: {}
+[27.040639] (-) TimerEvent: {}
+[27.140797] (-) TimerEvent: {}
+[27.240959] (-) TimerEvent: {}
+[27.341111] (-) TimerEvent: {}
+[27.441267] (-) TimerEvent: {}
+[27.541423] (-) TimerEvent: {}
+[27.641578] (-) TimerEvent: {}
+[27.741725] (-) TimerEvent: {}
+[27.841875] (-) TimerEvent: {}
+[27.942034] (-) TimerEvent: {}
+[28.042193] (-) TimerEvent: {}
+[28.142437] (-) TimerEvent: {}
+[28.242675] (-) TimerEvent: {}
+[28.342817] (-) TimerEvent: {}
+[28.442946] (-) TimerEvent: {}
+[28.543089] (-) TimerEvent: {}
+[28.643242] (-) TimerEvent: {}
+[28.743372] (-) TimerEvent: {}
+[28.843500] (-) TimerEvent: {}
+[28.943645] (-) TimerEvent: {}
+[29.043798] (-) TimerEvent: {}
+[29.143989] (-) TimerEvent: {}
+[29.244150] (-) TimerEvent: {}
+[29.344320] (-) TimerEvent: {}
+[29.444485] (-) TimerEvent: {}
+[29.544635] (-) TimerEvent: {}
+[29.644782] (-) TimerEvent: {}
+[29.744936] (-) TimerEvent: {}
+[29.845086] (-) TimerEvent: {}
+[29.945241] (-) TimerEvent: {}
+[30.045389] (-) TimerEvent: {}
+[30.145541] (-) TimerEvent: {}
+[30.245696] (-) TimerEvent: {}
+[30.345860] (-) TimerEvent: {}
+[30.446016] (-) TimerEvent: {}
+[30.546170] (-) TimerEvent: {}
+[30.646329] (-) TimerEvent: {}
+[30.746491] (-) TimerEvent: {}
+[30.846650] (-) TimerEvent: {}
+[30.946811] (-) TimerEvent: {}
+[31.046972] (-) TimerEvent: {}
+[31.147183] (-) TimerEvent: {}
+[31.240980] (adaptive_lio) StdoutLine: {'line': b'[ 95%] Linking CXX executable adaptive_lio_node\n'}
+[31.247226] (-) TimerEvent: {}
+[31.347379] (-) TimerEvent: {}
+[31.447585] (-) TimerEvent: {}
+[31.547736] (-) TimerEvent: {}
+[31.647893] (-) TimerEvent: {}
+[31.748060] (-) TimerEvent: {}
+[31.848215] (-) TimerEvent: {}
+[31.930800] (adaptive_lio) StdoutLine: {'line': b'[100%] Built target adaptive_lio_node\n'}
+[31.948337] (-) TimerEvent: {}
+[31.990617] (adaptive_lio) CommandEnded: {'returncode': 0}
+[31.991820] (adaptive_lio) JobProgress: {'identifier': 'adaptive_lio', 'progress': 'install'}
+[32.007898] (adaptive_lio) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio'], 'cwd': '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio', 'env': OrderedDict([('GJS_DEBUG_TOPICS', 'JS ERROR;JS LOG'), ('VSCODE_CWD', '/home/pace2204'), ('LANGUAGE', 'zh_CN:zh'), ('USER', 'pace2204'), ('VSCODE_NLS_CONFIG', '{"userLocale":"zh-cn","osLocale":"en","resolvedLanguage":"zh-cn","defaultMessagesFile":"/usr/share/qoder/resources/app/out/nls.messages.json","languagePack":{"translationsConfigFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/tcf.json","messagesFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/0.4.7_ba2c98a811c6e5222a3d7f07e51e5b512cf9e403/nls.messages.json","corruptMarkerFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/corrupted.info"},"locale":"zh-cn","availableLanguages":{"*":"zh-cn"},"_languagePackId":"3afffd5016528ded1c796a08d125a4d5.zh-cn","_languagePackSupport":true,"_translationsConfigFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/tcf.json","_cacheRoot":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn","_resolvedLanguagePackCoreLocation":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/0.4.7_ba2c98a811c6e5222a3d7f07e51e5b512cf9e403","_corruptedFile":"/home/pace2204/.config/Qoder/clp/3afffd5016528ded1c796a08d125a4d5.zh-cn/corrupted.info"}'), ('GIT_EDITOR', 'true'), ('XDG_SESSION_TYPE', 'wayland'), ('SHLVL', '1'), ('LD_LIBRARY_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib'), ('HOME', '/home/pace2204'), ('CHROME_DESKTOP', 'qoder.desktop'), ('OLDPWD', '/home/pace2204/copy/slam-mid360-volita'), ('DESKTOP_SESSION', 'ubuntu'), ('VSCODE_IPC_HOOK', '/run/user/1000/vscode-415d8430-1.10-main.sock'), ('GIO_LAUNCHED_DESKTOP_FILE', '/usr/share/applications/qoder.desktop'), ('ROS_PYTHON_VERSION', '3'), ('GNOME_SHELL_SESSION_MODE', 'ubuntu'), ('GTK_MODULES', 'gail:atk-bridge'), ('MANAGERPID', '1055'), ('SYSTEMD_EXEC_PID', '1291'), ('IM_CONFIG_CHECK_ENV', '1'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('QODERCLI_INTEGRATION_MODE', 'quest'), ('GIO_LAUNCHED_DESKTOP_FILE_PID', '375435'), ('IM_CONFIG_PHASE', '1'), ('WAYLAND_DISPLAY', 'wayland-0'), ('COLCON_PREFIX_PATH', '/home/pace2204/livox_ws/install'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'pace2204'), ('JOURNAL_STREAM', '8:17332'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('XDG_SESSION_CLASS', 'user'), ('TYPE_IS_ARMS', 'true'), ('USERNAME', 'pace2204'), ('GNOME_DESKTOP_SESSION_ID', 'this-is-deprecated'), ('ROS_LOCALHOST_ONLY', '0'), ('VSCODE_BRAND', 'Qoder'), ('PATH', '/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'), ('SESSION_MANAGER', 'local/pace2204-BQM5:@/tmp/.ICE-unix/1245,unix/pace2204-BQM5:/tmp/.ICE-unix/1245'), ('INVOCATION_ID', '24b5279f95ef46a895d7ed97825347e4'), ('XDG_MENU_PREFIX', 'gnome-'), ('GNOME_SETUP_DISPLAY', ':1'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('GDK_BACKEND', 'x11'), ('ARMS_APP_NAME', 'qoder-cosy'), ('DISPLAY', ':0'), ('ARMS_REGION_ID', 'ap-northeast-1'), ('LANG', 'zh_CN.UTF-8'), ('XDG_CURRENT_DESKTOP', 'Unity'), ('XMODIFIERS', '@im=ibus'), ('XDG_SESSION_DESKTOP', 'ubuntu'), ('XAUTHORITY', '/run/user/1000/.mutter-Xwaylandauth.3YDOL3'), ('SSH_AGENT_LAUNCHER', 'gnome-keyring'), ('SSH_AUTH_SOCK', '/run/user/1000/keyring/ssh'), ('AMENT_PREFIX_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2:/opt/ros/humble'), ('ORIGINAL_XDG_CURRENT_DESKTOP', 'ubuntu:GNOME'), ('SHELL', '/bin/bash'), ('QT_ACCESSIBILITY', '1'), ('NO_AT_BRIDGE', '1'), ('GDMSESSION', 'ubuntu'), ('GJS_DEBUG_OUTPUT', 'stderr'), ('ARMS_ENABLE', 'true'), ('QT_IM_MODULE', 'ibus'), ('PWD', '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio'), ('XDG_CONFIG_DIRS', '/etc/xdg/xdg-ubuntu:/etc/xdg'), ('VSCODE_CODE_CACHE_PATH', '/home/pace2204/.config/Qoder/CachedData/ba2c98a811c6e5222a3d7f07e51e5b512cf9e403'), ('XDG_DATA_DIRS', '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/pace2204/livox_ws/install/livox_ros_driver2/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('QODER_CLI', '1'), ('COLCON', '1'), ('FEATURE_FLAGS', '{"authUserPlanTierName":true,"welcomeFirstLaunchKey":"qoder.firstLaunch","welcomeOnboardingUseCustomStyle":false,"questModeEnable":true,"repoWikiEnable":true,"codebaseIgnoreFileName":".qoderignore","chatDefaultMode":"agent","chatDefaultAskModeUseTools":true,"currentPlanTitleKey":"application.config.general.plan.currentPlan.title","enableCreditUsage":true,"hasDedicatedUrlSetting":false,"showWelcomeMessage":false,"showModelTierSelector":true,"showModelSelector":false,"landingPageNeedLoginBtn":true,"preferredLanguageSupportOnlyZhAndEn":false,"enableSecurityFilter":false,"enableCodeChanges":false,"enableGitCommit":false,"enableLocalFile":true,"enableUserPlanUpgrade":true,"defaultBigModelEndpoint":"https://center.qoder.sh","improvementPlanSetting":true,"supportOrganizationCommand":false,"enableDynamicConfig":true,"qoderDirectAuth":true,"feedbackMethodIsEmail":true,"commit":"ba2c98a811c6e5222a3d7f07e51e5b512cf9e403","date":"2026-02-13T07:13:54.052Z","checksums":{"vs/base/parts/sandbox/electron-sandbox/preload.js":"eMCMtyPVVMxe6uce3NknivMZgd2q6ljQPMr7vRScAYk","vs/workbench/workbench.desktop.main.js":"SXd9pOwo55Yt83OEiXFoPAZHye0pnQIrxbQ70O+Sed0","vs/workbench/workbench.desktop.main.css":"ks0fu1idwMDL7fIcSu1ifhgVpKdkCZziL+7TE1Yc0eo","vs/workbench/api/node/extensionHostProcess.js":"O9uuxViaBomQawTGz+iPBQciGCUSdznm4hYtj/4ed0E","vs/code/electron-sandbox/workbench/workbench.html":"qCUV1BYtmJSS5BrtctLLLnPUm3g0BF+THziYLDg2hCo","vs/code/electron-sandbox/workbench/workbench.js":"HTzPHXSSGaB8b0ToK7BcL04+DQWpVjGgEPRXhP7jxW4"},"version":"0.4.7"}'), ('CMAKE_PREFIX_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2:/opt/ros/humble'), ('VSCODE_PID', '375435')]), 'shell': False}
+[32.022876] (adaptive_lio) StdoutLine: {'line': b'-- Install configuration: "Release"\n'}
+[32.023296] (adaptive_lio) StdoutLine: {'line': b'-- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node\n'}
+[32.027832] (adaptive_lio) StdoutLine: {'line': b'-- Set runtime path of "/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node" to ""\n'}
+[32.028599] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch\n'}
+[32.029033] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch/run.launch.py\n'}
+[32.029245] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config\n'}
+[32.029443] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m.yaml\n'}
+[32.029632] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/adaptive_lio.rviz\n'}
+[32.029829] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m copy.yaml\n'}
+[32.030030] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/package_run_dependencies/adaptive_lio\n'}
+[32.030197] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/parent_prefix_path/adaptive_lio\n'}
+[32.030358] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/ament_prefix_path.dsv\n'}
+[32.030795] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/path.dsv\n'}
+[32.031731] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.bash\n'}
+[32.032426] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.sh\n'}
+[32.032522] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.zsh\n'}
+[32.032609] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.dsv\n'}
+[32.032693] (adaptive_lio) StdoutLine: {'line': b'-- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.dsv\n'}
+[32.032921] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/packages/adaptive_lio\n'}
+[32.033017] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig.cmake\n'}
+[32.033096] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig-version.cmake\n'}
+[32.033172] (adaptive_lio) StdoutLine: {'line': b'-- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.xml\n'}
+[32.033281] (adaptive_lio) CommandEnded: {'returncode': 0}
+[32.048551] (-) TimerEvent: {}
+[32.052536] (adaptive_lio) JobEnded: {'identifier': 'adaptive_lio', 'rc': 0}
+[32.053010] (-) EventReactorShutdown: {}

@@ -1,0 +1,39 @@
+[0.007s] Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
+[0.068s] Consolidate compiler generated dependencies of target adaptive_lio.common
+[0.069s] Consolidate compiler generated dependencies of target adaptive_lio.pre
+[0.081s] [ 40%] Built target adaptive_lio.common
+[0.084s] [ 50%] Built target adaptive_lio.pre
+[0.093s] Consolidate compiler generated dependencies of target adaptive_lio.algo
+[0.107s] [ 60%] Built target adaptive_lio.algo
+[0.124s] Consolidate compiler generated dependencies of target adaptive_lio.lio
+[0.136s] [ 65%] Building CXX object CMakeFiles/adaptive_lio.lio.dir/src/lio/lidarodom.cpp.o
+[30.331s] [ 70%] Linking CXX static library libadaptive_lio.lio.a
+[30.371s] [ 85%] Built target adaptive_lio.lio
+[30.407s] Consolidate compiler generated dependencies of target adaptive_lio_node
+[30.431s] [ 90%] Linking CXX executable adaptive_lio_node
+[31.208s] [100%] Built target adaptive_lio_node
+[31.251s] Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
+[31.270s] Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio
+[31.282s] -- Install configuration: "Release"
+[31.282s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node
+[31.287s] -- Set runtime path of "/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node" to ""
+[31.287s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch
+[31.287s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch/run.launch.py
+[31.287s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config
+[31.287s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m.yaml
+[31.287s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/adaptive_lio.rviz
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m copy.yaml
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/package_run_dependencies/adaptive_lio
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/parent_prefix_path/adaptive_lio
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/ament_prefix_path.dsv
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/path.dsv
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.bash
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.sh
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.zsh
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.dsv
+[31.288s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.dsv
+[31.288s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/packages/adaptive_lio
+[31.289s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig.cmake
+[31.289s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig-version.cmake
+[31.289s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.xml
+[31.290s] Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio

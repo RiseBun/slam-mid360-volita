@@ -1,0 +1,49 @@
+[0.007s] Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
+[0.082s] [ 40%] Built target adaptive_lio.common
+[0.087s] [ 50%] Built target adaptive_lio.pre
+[0.131s] [ 60%] Built target adaptive_lio.algo
+[0.191s] [ 85%] Built target adaptive_lio.lio
+[0.244s] [ 90%] Building CXX object CMakeFiles/adaptive_lio_node.dir/src/apps/main_ros2.cpp.o
+[19.254s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In destructor ‘AdaptiveLioNode::~AdaptiveLioNode()’:
+[19.254s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:288:23: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[19.254s]   288 |                 system(cmd.c_str());
+[19.255s]       |                 ~~~~~~^~~~~~~~~~~~~
+[19.600s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:
+[19.600s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:694:19: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[19.600s]   694 |             system(cmd.c_str());
+[19.600s]       |             ~~~~~~^~~~~~~~~~~~~
+[19.601s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:
+[19.601s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:773:19: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[19.601s]   773 |             system(cmd.c_str());
+[19.601s]       |             ~~~~~~^~~~~~~~~~~~~
+[19.602s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In member function ‘void AdaptiveLioNode::saveMapCallback(std::shared_ptr<std_srvs::srv::Trigger_Request_<std::allocator<void> > >, std::shared_ptr<std_srvs::srv::Trigger_Response_<std::allocator<void> > >)’:
+[19.602s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:613:23: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[19.602s]   613 |                 system(cmd.c_str());
+[19.603s]       |                 ~~~~~~^~~~~~~~~~~~~
+[31.241s] [ 95%] Linking CXX executable adaptive_lio_node
+[31.930s] [100%] Built target adaptive_lio_node
+[31.990s] Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
+[32.009s] Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio
+[32.023s] -- Install configuration: "Release"
+[32.023s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node
+[32.028s] -- Set runtime path of "/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node" to ""
+[32.028s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch
+[32.029s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch/run.launch.py
+[32.029s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config
+[32.029s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m.yaml
+[32.029s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/adaptive_lio.rviz
+[32.029s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m copy.yaml
+[32.030s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/package_run_dependencies/adaptive_lio
+[32.030s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/parent_prefix_path/adaptive_lio
+[32.030s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/ament_prefix_path.dsv
+[32.031s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/path.dsv
+[32.032s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.bash
+[32.032s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.sh
+[32.032s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.zsh
+[32.032s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.dsv
+[32.032s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.dsv
+[32.032s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/packages/adaptive_lio
+[32.032s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig.cmake
+[32.033s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig-version.cmake
+[32.033s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.xml
+[32.033s] Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio

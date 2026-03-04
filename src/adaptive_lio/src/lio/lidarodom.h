@@ -65,6 +65,10 @@ namespace zjloc
 
           double satu_acc;
           double satu_gyro;
+
+          // Ceres solver options
+          int ceres_iterations = 5;  // default 5
+          int ceres_threads = 3;     // default 3
      };
 
      class lidarodom_m
@@ -160,6 +164,7 @@ namespace zjloc
           bool imu_need_init_ = true; // 是否需要估计IMU初始零偏
           int index_frame = 1;
           lioOptions_m options_;
+          ceres::Solver::Options solver_options_;
 
           CloudConvertInterface *convert = nullptr;
 
@@ -196,8 +201,8 @@ namespace zjloc
           std::condition_variable cond;
 
           state *current_state;
-          std::vector<cloudFrame *> all_cloud_frame; //  cache all frame
-          std::vector<state *> all_state_frame;      //   多保留一份state，这样可以不用去缓存all_cloud_frame
+          state *prev_state_ = nullptr;   // 倒数第2帧 state（环形缓冲，替代 all_state_frame）
+          state *last_state_ = nullptr;   // 最后一帧 state
 
           std::function<bool(std::string &topic_name, CloudPtr &cloud, double time)> pub_cloud_to_ros;
           std::function<bool(std::string &topic_name, SE3 &pose, double time)> pub_pose_to_ros;

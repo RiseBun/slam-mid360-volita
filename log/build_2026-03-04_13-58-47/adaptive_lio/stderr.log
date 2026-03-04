@@ -1,0 +1,16 @@
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In destructor ‘AdaptiveLioNode::~AdaptiveLioNode()’:
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:298:23: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  298 |                 system(cmd.c_str());
+      |                 ~~~~~~^~~~~~~~~~~~~
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:704:19: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  704 |             system(cmd.c_str());
+      |             ~~~~~~^~~~~~~~~~~~~
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:783:19: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  783 |             system(cmd.c_str());
+      |             ~~~~~~^~~~~~~~~~~~~
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In member function ‘void AdaptiveLioNode::saveMapCallback(std::shared_ptr<std_srvs::srv::Trigger_Request_<std::allocator<void> > >, std::shared_ptr<std_srvs::srv::Trigger_Response_<std::allocator<void> > >)’:
+/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:623:23: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  623 |                 system(cmd.c_str());
+      |                 ~~~~~~^~~~~~~~~~~~~

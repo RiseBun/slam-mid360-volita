@@ -63,6 +63,15 @@ public:
 
      int NumVoxelMaps() const { return options_.resolutions.size(); }
 
+     // 获取所有分辨率下的 voxel 总数
+     size_t TotalVoxelCount() const
+     {
+          size_t total = 0;
+          for (auto &vm : voxel_maps_)
+               total += vm.map.size();
+          return total;
+     }
+
      SearchParams SearchParamsFromRadiusSearch(double radius) const;
 
      SearchParams SearchParamsFromRadius(double radius) const;

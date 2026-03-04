@@ -1,0 +1,147 @@
+[0.000000] (-) TimerEvent: {}
+[0.000461] (adaptive_lio) JobQueued: {'identifier': 'adaptive_lio', 'dependencies': OrderedDict()}
+[0.000615] (adaptive_lio) JobStarted: {'identifier': 'adaptive_lio'}
+[0.005335] (adaptive_lio) JobProgress: {'identifier': 'adaptive_lio', 'progress': 'cmake'}
+[0.005876] (adaptive_lio) Command: {'cmd': ['/usr/bin/cmake', '/home/pace2204/slam-mid360-volita/src/adaptive_lio', '-DAMENT_CMAKE_SYMLINK_INSTALL=1', '-DCMAKE_INSTALL_PREFIX=/home/pace2204/slam-mid360-volita/install/adaptive_lio'], 'cwd': '/home/pace2204/slam-mid360-volita/build/adaptive_lio', 'env': OrderedDict([('LESSOPEN', '| /usr/bin/lesspipe %s'), ('HTTPS_PROXY', 'http://127.0.0.1:7897/'), ('no_proxy', 'localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,::1'), ('LANGUAGE', 'zh_CN:zh'), ('USER', 'pace2204'), ('all_proxy', 'socks://127.0.0.1:7897/'), ('XDG_SESSION_TYPE', 'wayland'), ('SHLVL', '1'), ('LD_LIBRARY_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib'), ('HOME', '/home/pace2204'), ('OLDPWD', '/home/pace2204'), ('DESKTOP_SESSION', 'ubuntu'), ('NO_PROXY', 'localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,::1'), ('ROS_PYTHON_VERSION', '3'), ('GNOME_SHELL_SESSION_MODE', 'ubuntu'), ('GTK_MODULES', 'gail:atk-bridge'), ('SYSTEMD_EXEC_PID', '1188'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('COLORTERM', 'truecolor'), ('IM_CONFIG_PHASE', '1'), ('WAYLAND_DISPLAY', 'wayland-0'), ('https_proxy', 'http://127.0.0.1:7897/'), ('COLCON_PREFIX_PATH', '/home/pace2204/livox_ws/install:/home/pace2204/slam-mid360-volita/install'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'pace2204'), ('ALL_PROXY', 'socks://127.0.0.1:7897/'), ('http_proxy', 'http://127.0.0.1:7897/'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('XDG_SESSION_CLASS', 'user'), ('USERNAME', 'pace2204'), ('TERM', 'xterm-256color'), ('GNOME_DESKTOP_SESSION_ID', 'this-is-deprecated'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'), ('SESSION_MANAGER', 'local/pace2204-BQM5:@/tmp/.ICE-unix/1147,unix/pace2204-BQM5:/tmp/.ICE-unix/1147'), ('XDG_MENU_PREFIX', 'gnome-'), ('GNOME_TERMINAL_SCREEN', '/org/gnome/Terminal/screen/885e1225_83d3_4a3e_8d81_4adad4daf8e4'), ('GNOME_SETUP_DISPLAY', ':1'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('DISPLAY', ':0'), ('LANG', 'zh_CN.UTF-8'), ('XDG_CURRENT_DESKTOP', 'ubuntu:GNOME'), ('XMODIFIERS', '@im=ibus'), ('XDG_SESSION_DESKTOP', 'ubuntu'), ('XAUTHORITY', '/run/user/1000/.mutter-Xwaylandauth.SS8CL3'), ('LS_COLORS', 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:'), ('GNOME_TERMINAL_SERVICE', ':1.217'), ('SSH_AGENT_LAUNCHER', 'gnome-keyring'), ('SSH_AUTH_SOCK', '/run/user/1000/keyring/ssh'), ('AMENT_PREFIX_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2:/opt/ros/humble'), ('SHELL', '/bin/bash'), ('QT_ACCESSIBILITY', '1'), ('GDMSESSION', 'ubuntu'), ('LESSCLOSE', '/usr/bin/lesspipe %s %s'), ('QT_IM_MODULE', 'ibus'), ('PWD', '/home/pace2204/slam-mid360-volita/build/adaptive_lio'), ('XDG_CONFIG_DIRS', '/etc/xdg/xdg-ubuntu:/etc/xdg'), ('XDG_DATA_DIRS', '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/pace2204/livox_ws/install/livox_ros_driver2/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('HTTP_PROXY', 'http://127.0.0.1:7897/'), ('COLCON', '1'), ('VTE_VERSION', '6800'), ('CMAKE_PREFIX_PATH', '/home/pace2204/livox_ws/install/livox_ros_driver2:/opt/ros/humble')]), 'shell': False}
+[0.079760] (adaptive_lio) StdoutLine: {'line': b'-- The C compiler identification is GNU 11.4.0\n'}
+[0.099885] (-) TimerEvent: {}
+[0.142989] (adaptive_lio) StdoutLine: {'line': b'-- The CXX compiler identification is GNU 11.4.0\n'}
+[0.149176] (adaptive_lio) StdoutLine: {'line': b'-- Detecting C compiler ABI info\n'}
+[0.200001] (-) TimerEvent: {}
+[0.223339] (adaptive_lio) StdoutLine: {'line': b'-- Detecting C compiler ABI info - done\n'}
+[0.232011] (adaptive_lio) StdoutLine: {'line': b'-- Check for working C compiler: /usr/bin/cc - skipped\n'}
+[0.232355] (adaptive_lio) StdoutLine: {'line': b'-- Detecting C compile features\n'}
+[0.232830] (adaptive_lio) StdoutLine: {'line': b'-- Detecting C compile features - done\n'}
+[0.236056] (adaptive_lio) StdoutLine: {'line': b'-- Detecting CXX compiler ABI info\n'}
+[0.300112] (-) TimerEvent: {}
+[0.319719] (adaptive_lio) StdoutLine: {'line': b'-- Detecting CXX compiler ABI info - done\n'}
+[0.324620] (adaptive_lio) StdoutLine: {'line': b'-- Check for working CXX compiler: /usr/bin/c++ - skipped\n'}
+[0.324829] (adaptive_lio) StdoutLine: {'line': b'-- Detecting CXX compile features\n'}
+[0.325147] (adaptive_lio) StdoutLine: {'line': b'-- Detecting CXX compile features - done\n'}
+[0.326402] (adaptive_lio) StdoutLine: {'line': b'-- Found ament_cmake: 1.3.12 (/opt/ros/humble/share/ament_cmake/cmake)\n'}
+[0.400186] (-) TimerEvent: {}
+[0.442051] (adaptive_lio) StdoutLine: {'line': b'-- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter \n'}
+[0.492503] (adaptive_lio) StdoutLine: {'line': b'-- Override CMake install command with custom implementation using symlinks instead of copying resources\n'}
+[0.500252] (-) TimerEvent: {}
+[0.507767] (adaptive_lio) StdoutLine: {'line': b'-- Found rclcpp: 16.0.17 (/opt/ros/humble/share/rclcpp/cmake)\n'}
+[0.536066] (adaptive_lio) StdoutLine: {'line': b'-- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)\n'}
+[0.538589] (adaptive_lio) StdoutLine: {'line': b'-- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)\n'}
+[0.543474] (adaptive_lio) StdoutLine: {'line': b'-- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)\n'}
+[0.550566] (adaptive_lio) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c\n'}
+[0.559990] (adaptive_lio) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp\n'}
+[0.585301] (adaptive_lio) StdoutLine: {'line': b'-- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)\n'}
+[0.586698] (adaptive_lio) StdoutLine: {'line': b'-- Found rmw_fastrtps_cpp: 6.2.9 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)\n'}
+[0.600314] (-) TimerEvent: {}
+[0.658232] (adaptive_lio) StdoutLine: {'line': b'-- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.2")  \n'}
+[0.676232] (adaptive_lio) StdoutLine: {'line': b'-- Found FastRTPS: /opt/ros/humble/include  \n'}
+[0.700405] (-) TimerEvent: {}
+[0.706276] (adaptive_lio) StdoutLine: {'line': b"-- Using RMW implementation 'rmw_fastrtps_cpp' as default\n"}
+[0.710688] (adaptive_lio) StdoutLine: {'line': b'-- Looking for pthread.h\n'}
+[0.791451] (adaptive_lio) StdoutLine: {'line': b'-- Looking for pthread.h - found\n'}
+[0.792036] (adaptive_lio) StdoutLine: {'line': b'-- Performing Test CMAKE_HAVE_LIBC_PTHREAD\n'}
+[0.800497] (-) TimerEvent: {}
+[0.868539] (adaptive_lio) StdoutLine: {'line': b'-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success\n'}
+[0.869911] (adaptive_lio) StdoutLine: {'line': b'-- Found Threads: TRUE  \n'}
+[0.900553] (-) TimerEvent: {}
+[0.908032] (adaptive_lio) StdoutLine: {'line': b'-- Found sensor_msgs: 4.9.0 (/opt/ros/humble/share/sensor_msgs/cmake)\n'}
+[0.927317] (adaptive_lio) StdoutLine: {'line': b'-- Found nav_msgs: 4.9.0 (/opt/ros/humble/share/nav_msgs/cmake)\n'}
+[0.938529] (adaptive_lio) StdoutLine: {'line': b'-- Found tf2: 0.25.18 (/opt/ros/humble/share/tf2/cmake)\n'}
+[0.944073] (adaptive_lio) StdoutLine: {'line': b'-- Found tf2_ros: 0.25.18 (/opt/ros/humble/share/tf2_ros/cmake)\n'}
+[0.998882] (adaptive_lio) StdoutLine: {'line': b'-- Found pcl_conversions: 2.4.5 (/opt/ros/humble/share/pcl_conversions/cmake)\n'}
+[1.000616] (-) TimerEvent: {}
+[1.020765] (adaptive_lio) StdoutLine: {'line': b"-- Checking for module 'eigen3'\n"}
+[1.031607] (adaptive_lio) StdoutLine: {'line': b'--   Found eigen3, version 3.4.0\n'}
+[1.070303] (adaptive_lio) StdoutLine: {'line': b'-- Found Eigen: /usr/include/eigen3 (Required is at least version "3.1") \n'}
+[1.070493] (adaptive_lio) StdoutLine: {'line': b'-- Eigen found (include: /usr/include/eigen3, version: 3.4.0)\n'}
+[1.098555] (adaptive_lio) StdoutLine: {'line': b"-- Checking for module 'flann'\n"}
+[1.100683] (-) TimerEvent: {}
+[1.110888] (adaptive_lio) StdoutLine: {'line': b'--   Found flann, version 1.9.1\n'}
+[1.154451] (adaptive_lio) StdoutLine: {'line': b'-- Found FLANN: /usr/lib/x86_64-linux-gnu/libflann_cpp.so  \n'}
+[1.154703] (adaptive_lio) StdoutLine: {'line': b'-- FLANN found (include: /usr/include, lib: /usr/lib/x86_64-linux-gnu/libflann_cpp.so)\n'}
+[1.200767] (-) TimerEvent: {}
+[1.300982] (-) TimerEvent: {}
+[1.401235] (-) TimerEvent: {}
+[1.501501] (-) TimerEvent: {}
+[1.601909] (-) TimerEvent: {}
+[1.702185] (-) TimerEvent: {}
+[1.802456] (-) TimerEvent: {}
+[1.902752] (-) TimerEvent: {}
+[2.003004] (-) TimerEvent: {}
+[2.086474] (adaptive_lio) StdoutLine: {'line': b"-- Checking for module 'libusb-1.0'\n"}
+[2.100653] (adaptive_lio) StdoutLine: {'line': b'--   Found libusb-1.0, version 1.0.25\n'}
+[2.103066] (-) TimerEvent: {}
+[2.140361] (adaptive_lio) StdoutLine: {'line': b'-- Found libusb: /usr/lib/x86_64-linux-gnu/libusb-1.0.so  \n'}
+[2.141581] (adaptive_lio) StdoutLine: {'line': b'-- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)\n'}
+[2.203172] (-) TimerEvent: {}
+[2.204644] (adaptive_lio) StdoutLine: {'line': b'-- OpenNI2 found (version: 2.2.0.33, include: /usr/include/openni2, lib: /usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb)\n'}
+[2.303257] (-) TimerEvent: {}
+[2.326414] (adaptive_lio) StdoutLine: {'line': b'-- Eigen found (include: /usr/include/eigen3, version: 3.4.0)\n'}
+[2.331789] (adaptive_lio) StdoutLine: {'line': b'-- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)\n'}
+[2.337598] (adaptive_lio) StdoutLine: {'line': b'-- OpenNI2 found (version: 2.2.0.33, include: /usr/include/openni2, lib: /usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb)\n'}
+[2.403361] (-) TimerEvent: {}
+[2.437918] (adaptive_lio) StdoutLine: {'line': b'-- Found Qhull version 8.0.2\n'}
+[2.503447] (-) TimerEvent: {}
+[2.537147] (adaptive_lio) StdoutLine: {'line': b'-- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)\n'}
+[2.603536] (-) TimerEvent: {}
+[2.641680] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_COMMON: /usr/lib/x86_64-linux-gnu/libpcl_common.so  \n'}
+[2.642170] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_KDTREE: /usr/lib/x86_64-linux-gnu/libpcl_kdtree.so  \n'}
+[2.642673] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_OCTREE: /usr/lib/x86_64-linux-gnu/libpcl_octree.so  \n'}
+[2.643158] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_SEARCH: /usr/lib/x86_64-linux-gnu/libpcl_search.so  \n'}
+[2.643692] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_SAMPLE_CONSENSUS: /usr/lib/x86_64-linux-gnu/libpcl_sample_consensus.so  \n'}
+[2.644196] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_FILTERS: /usr/lib/x86_64-linux-gnu/libpcl_filters.so  \n'}
+[2.644455] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_2D: /usr/include/pcl-1.12  \n'}
+[2.644696] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_GEOMETRY: /usr/include/pcl-1.12  \n'}
+[2.645194] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_IO: /usr/lib/x86_64-linux-gnu/libpcl_io.so  \n'}
+[2.645786] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_FEATURES: /usr/lib/x86_64-linux-gnu/libpcl_features.so  \n'}
+[2.646386] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_ML: /usr/lib/x86_64-linux-gnu/libpcl_ml.so  \n'}
+[2.646910] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_SEGMENTATION: /usr/lib/x86_64-linux-gnu/libpcl_segmentation.so  \n'}
+[2.647579] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_VISUALIZATION: /usr/lib/x86_64-linux-gnu/libpcl_visualization.so  \n'}
+[2.648186] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_SURFACE: /usr/lib/x86_64-linux-gnu/libpcl_surface.so  \n'}
+[2.648777] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_REGISTRATION: /usr/lib/x86_64-linux-gnu/libpcl_registration.so  \n'}
+[2.649371] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_KEYPOINTS: /usr/lib/x86_64-linux-gnu/libpcl_keypoints.so  \n'}
+[2.649935] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_TRACKING: /usr/lib/x86_64-linux-gnu/libpcl_tracking.so  \n'}
+[2.650488] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_RECOGNITION: /usr/lib/x86_64-linux-gnu/libpcl_recognition.so  \n'}
+[2.651123] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_STEREO: /usr/lib/x86_64-linux-gnu/libpcl_stereo.so  \n'}
+[2.651686] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_APPS: /usr/lib/x86_64-linux-gnu/libpcl_apps.so  \n'}
+[2.652242] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_IN_HAND_SCANNER: /usr/include/pcl-1.12  \n'}
+[2.652478] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_MODELER: /usr/include/pcl-1.12  \n'}
+[2.652715] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_POINT_CLOUD_EDITOR: /usr/include/pcl-1.12  \n'}
+[2.653224] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_OUTOFCORE: /usr/lib/x86_64-linux-gnu/libpcl_outofcore.so  \n'}
+[2.653824] (adaptive_lio) StdoutLine: {'line': b'-- Found PCL_PEOPLE: /usr/lib/x86_64-linux-gnu/libpcl_people.so  \n'}
+[2.655262] (adaptive_lio) StdoutLine: {'line': b'-- Found livox_ros_driver2: 1.0.0 (/home/pace2204/livox_ws/install/livox_ros_driver2/share/livox_ros_driver2/cmake)\n'}
+[2.668615] (adaptive_lio) StdoutLine: {'line': b'-- Found std_srvs: 4.9.0 (/opt/ros/humble/share/std_srvs/cmake)\n'}
+[2.677369] (adaptive_lio) StderrLine: {'line': b'\x1b[33mCMake Warning (dev) at CMakeLists.txt:35 (find_package):\n'}
+[2.677462] (adaptive_lio) StderrLine: {'line': b'  Policy CMP0074 is not set: find_package uses <PackageName>_ROOT variables.\n'}
+[2.677496] (adaptive_lio) StderrLine: {'line': b'  Run "cmake --help-policy CMP0074" for policy details.  Use the cmake_policy\n'}
+[2.677526] (adaptive_lio) StderrLine: {'line': b'  command to set the policy and suppress this warning.\n'}
+[2.677554] (adaptive_lio) StderrLine: {'line': b'\n'}
+[2.677582] (adaptive_lio) StderrLine: {'line': b'  CMake variable PCL_ROOT is set to:\n'}
+[2.677610] (adaptive_lio) StderrLine: {'line': b'\n'}
+[2.677637] (adaptive_lio) StderrLine: {'line': b'    /usr\n'}
+[2.677664] (adaptive_lio) StderrLine: {'line': b'\n'}
+[2.677690] (adaptive_lio) StderrLine: {'line': b'  For compatibility, CMake is ignoring the variable.\n'}
+[2.677718] (adaptive_lio) StderrLine: {'line': b'This warning is for project developers.  Use -Wno-dev to suppress it.\n'}
+[2.677748] (adaptive_lio) StderrLine: {'line': b'\x1b[0m\n'}
+[2.687755] (adaptive_lio) StderrLine: {'line': b'\x1b[31mCMake Error at CMakeLists.txt:36 (find_package):\n'}
+[2.687801] (adaptive_lio) StderrLine: {'line': b'  By not providing "FindCeres.cmake" in CMAKE_MODULE_PATH this project has\n'}
+[2.687831] (adaptive_lio) StderrLine: {'line': b'  asked CMake to find a package configuration file provided by "Ceres", but\n'}
+[2.687861] (adaptive_lio) StderrLine: {'line': b'  CMake did not find one.\n'}
+[2.687891] (adaptive_lio) StderrLine: {'line': b'\n'}
+[2.687920] (adaptive_lio) StderrLine: {'line': b'  Could not find a package configuration file provided by "Ceres" with any of\n'}
+[2.687949] (adaptive_lio) StderrLine: {'line': b'  the following names:\n'}
+[2.687982] (adaptive_lio) StderrLine: {'line': b'\n'}
+[2.688009] (adaptive_lio) StderrLine: {'line': b'    CeresConfig.cmake\n'}
+[2.688036] (adaptive_lio) StderrLine: {'line': b'    ceres-config.cmake\n'}
+[2.688064] (adaptive_lio) StderrLine: {'line': b'\n'}
+[2.688092] (adaptive_lio) StderrLine: {'line': b'  Add the installation prefix of "Ceres" to CMAKE_PREFIX_PATH or set\n'}
+[2.688124] (adaptive_lio) StderrLine: {'line': b'  "Ceres_DIR" to a directory containing one of the above files.  If "Ceres"\n'}
+[2.688152] (adaptive_lio) StderrLine: {'line': b'  provides a separate development package or SDK, be sure it has been\n'}
+[2.688178] (adaptive_lio) StderrLine: {'line': b'  installed.\n'}
+[2.688205] (adaptive_lio) StderrLine: {'line': b'\n'}
+[2.688231] (adaptive_lio) StderrLine: {'line': b'\x1b[0m\n'}
+[2.688292] (adaptive_lio) StdoutLine: {'line': b'-- Configuring incomplete, errors occurred!\n'}
+[2.688327] (adaptive_lio) StdoutLine: {'line': b'See also "/home/pace2204/slam-mid360-volita/build/adaptive_lio/CMakeFiles/CMakeOutput.log".\n'}
+[2.699092] (adaptive_lio) CommandEnded: {'returncode': 1}
+[2.703590] (-) TimerEvent: {}
+[2.721013] (adaptive_lio) JobEnded: {'identifier': 'adaptive_lio', 'rc': 1}
+[2.731715] (-) EventReactorShutdown: {}

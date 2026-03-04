@@ -1,8 +1,23 @@
 #include "common/config.hpp"
 #include "lidarodom.h"
 
+#include <fstream>
+#include <unistd.h>
+#include <iomanip>
+
 namespace zjloc
 {
+     // 获取当前进程 RSS 内存（MB）
+     static double getRSSMB()
+     {
+          std::ifstream statm("/proc/self/statm");
+          if (!statm.is_open())
+               return -1.0;
+          long pages = 0, rss_pages = 0;
+          statm >> pages >> rss_pages;
+          long page_size = sysconf(_SC_PAGESIZE);
+          return rss_pages * page_size / (1024.0 * 1024.0);
+     }
 
      lidarodom_m::lidarodom_m(/* args */)
      {
@@ -19,6 +34,8 @@ namespace zjloc
 
      lidarodom_m::~lidarodom_m()
      {
+          delete prev_state_;
+          delete last_state_;
      }
 
      void lidarodom_m::loadOptions()
@@ -52,6 +69,12 @@ namespace zjloc
 
                OPTION_CLAUSE(odometry_node, options_, sampling_rate, double);
                OPTION_CLAUSE(odometry_node, options_, max_num_residuals, int);
+
+               // Ceres solver options (optional, with defaults)
+               if (odometry_node["ceres_iterations"])
+                    options_.ceres_iterations = odometry_node["ceres_iterations"].as<int>();
+               if (odometry_node["ceres_threads"])
+                    options_.ceres_threads = odometry_node["ceres_threads"].as<int>();
 
                std::string str_motion_compensation = odometry_node["motion_compensation"].as<std::string>();
                if (str_motion_compensation == "NONE")
@@ -185,6 +208,14 @@ namespace zjloc
           }
           LOG(WARNING) << "motion_compensation:" << options_.motion_compensation << ", model: " << options_.icpmodel;
 
+          // Initialize Ceres solver options once
+          solver_options_.max_num_iterations = options_.ceres_iterations;
+          solver_options_.num_threads = options_.ceres_threads;
+          solver_options_.minimizer_progress_to_stdout = false;
+          solver_options_.trust_region_strategy_type = ceres::TrustRegionStrategyType::LEVENBERG_MARQUARDT;
+          LOG(WARNING) << "Ceres solver: iterations=" << options_.ceres_iterations 
+                       << ", threads=" << options_.ceres_threads;
+
           return true;
      }
 
@@ -267,6 +298,8 @@ namespace zjloc
                return;
           }
 
+          auto frame_start = std::chrono::steady_clock::now();
+
           // std::cout << ANSI_DELETE_LAST_LINE;
           std::cout << ANSI_COLOR_GREEN << "============== process frame: "
                     << index_frame << ANSI_COLOR_RESET << std::endl;
@@ -334,14 +367,38 @@ namespace zjloc
                                          "pub cloud");
 
           p_frame->p_state = new state(current_state, true);
-          // all_cloud_frame.push_back(p_frame); //   TODO:     保存这个，特别费内存
-          state *tmp_state = new state(current_state, true);
-          all_state_frame.push_back(tmp_state);
+          delete prev_state_;
+          prev_state_ = last_state_;
+          last_state_ = new state(current_state, true);
           current_state = new state(current_state, false);
 
-          if (all_state_frame.size() > 2)
-               cache_vel = (all_state_frame[all_state_frame.size() - 1]->translation - all_state_frame[all_state_frame.size() - 2]->translation) /
+          if (prev_state_ != nullptr && last_state_ != nullptr)
+               cache_vel = (last_state_->translation - prev_state_->translation) /
                            (meas.lidar_end_time_ - meas.lidar_begin_time_);
+
+          // ===== 资源监控日志 =====
+          {
+               auto frame_end = std::chrono::steady_clock::now();
+               double frame_ms = std::chrono::duration_cast<std::chrono::duration<double>>(frame_end - frame_start).count() * 1000.0;
+
+               // 每10帧或前5帧输出一次资源状态
+               if (index_frame <= 5 || index_frame % 10 == 0)
+               {
+                    double rss_mb = getRSSMB();
+                    size_t voxel_count = voxel_map.size();
+                    size_t mmap_voxels = mmap->TotalVoxelCount();
+                    size_t mmap_points = mmap->NumPoints();
+
+                    std::cout << ANSI_COLOR_CYAN
+                              << "[MONITOR] frame=" << index_frame
+                              << "  frame_ms=" << std::fixed << std::setprecision(1) << frame_ms
+                              << "  RSS=" << std::setprecision(1) << rss_mb << "MB"
+                              << "  voxel_map=" << voxel_count
+                              << "  mmap_voxels=" << mmap_voxels
+                              << "  mmap_points=" << mmap_points
+                              << ANSI_COLOR_RESET << std::endl;
+               }
+          }
 
           index_frame++;
           p_frame->release();
@@ -389,9 +446,8 @@ namespace zjloc
           if (p_frame->frame_id > 1)
           {
                if (options_.log_print)
-                    std::cout << "all_cloud_frame.size():" << all_state_frame.size() << ", " << p_frame->frame_id << std::endl;
-               // previous_state = all_cloud_frame[p_frame->frame_id - 2]->p_state;
-               previous_state = all_state_frame[p_frame->frame_id - 2];
+                    std::cout << "state_frame index_frame:" << index_frame << ", " << p_frame->frame_id << std::endl;
+               previous_state = last_state_;
                previous_translation = previous_state->translation;
                previous_velocity = previous_state->translation - previous_state->translation_begin;
                previous_orientation = previous_state->rotation;
@@ -538,22 +594,9 @@ namespace zjloc
                     std::cout << "ERROR: " << ss_out.str();
                }
 
-               ceres::Solver::Options options;
-               options.max_num_iterations = 5;
-               options.num_threads = 3;
-               options.minimizer_progress_to_stdout = false;
-               options.trust_region_strategy_type = ceres::TrustRegionStrategyType::LEVENBERG_MARQUARDT;
-
-               // ceres::Solver::Options options;
-               // options.linear_solver_type = ceres::DENSE_SCHUR;
-               // options.trust_region_strategy_type = ceres::DOGLEG;
-               // options.max_num_iterations = 10;
-               // options.minimizer_progress_to_stdout = false;
-               // options.num_threads = 6;
-
                ceres::Solver::Summary summary;
 
-               ceres::Solve(options, &problem, &summary);
+               ceres::Solve(solver_options_, &problem, &summary);
 
                if (!summary.IsSolutionUsable())
                {
@@ -766,7 +809,6 @@ namespace zjloc
                                                                options_.min_number_neighbors));
 
                double point_to_plane_dist;
-               std::set<voxel> neighbor_voxels;
                for (int i(0); i < options_.num_closest_neighbors; ++i)
                {
                     point_to_plane_dist = std::abs((keypoint.point - vector_neighbors[i]).transpose() * neighborhood.normal);
@@ -860,15 +902,12 @@ namespace zjloc
                auto &keypoint = keypoints[k];
                auto &raw_point = keypoint.raw_point;
 
-               std::vector<voxel> voxels;
                auto vector_neighbors = searchNeighbors(voxel_map, keypoint.point,
                                                        nb_voxels_visited,
                                                        options_.size_voxel_map,
                                                        options_.max_number_neighbors,
                                                        kThresholdCapacity,
-                                                       options_.estimate_normal_from_neighborhood
-                                                           ? nullptr
-                                                           : &voxels);
+                                                       nullptr);
 
                if (vector_neighbors.size() < options_.min_number_neighbors)
                     continue;
@@ -887,7 +926,6 @@ namespace zjloc
                                                                options_.min_number_neighbors));
 
                double point_to_plane_dist;
-               std::set<voxel> neighbor_voxels;
                for (int i(0); i < options_.num_closest_neighbors; ++i)
                {
                     point_to_plane_dist = std::abs((keypoint.point - vector_neighbors[i]).transpose() * neighborhood.normal);
@@ -1131,20 +1169,20 @@ namespace zjloc
 
      void lidarodom_m::lasermap_fov_segment()
      {
-          //   use predict pose here
           Eigen::Vector3d location = current_state->translation;
-          // std::vector<voxel> voxels_to_erase;
-          // for (auto &pair : voxel_map)
-          // {
-          //      Eigen::Vector3d pt = pair.second.points[0];
-          //      if ((pt - location).squaredNorm() > (options_.max_distance * options_.max_distance))
-          //      {
-          //           voxels_to_erase.push_back(pair.first);
-          //      }
-          // }
-          // for (auto &vox : voxels_to_erase)
-          //      voxel_map.erase(vox);
-          // std::vector<voxel>().swap(voxels_to_erase);
+          double sq_max_distance = options_.max_distance * options_.max_distance;
+
+          std::vector<voxel> voxels_to_erase;
+          for (auto &pair : voxel_map)
+          {
+               Eigen::Vector3d pt = pair.second.points[0];
+               if ((pt - location).squaredNorm() > sq_max_distance)
+               {
+                    voxels_to_erase.push_back(pair.first);
+               }
+          }
+          for (auto &vox : voxels_to_erase)
+               voxel_map.erase(vox);
 
           mmap->RemoveElementsFarFromLocation(location, options_.max_distance);
      }
@@ -1212,7 +1250,7 @@ namespace zjloc
                          // 噪声由初始化器估计
                          eskf_.SetInitialConditions(options, imu_init_.GetInitBg(), imu_init_.GetInitBa(), imu_init_.GetGravity());
                          //   需要设置 p v r
-                         eskf_.SetX(SE3(all_state_frame[all_state_frame.size() - 1]->rotation, all_state_frame[all_state_frame.size() - 1]->translation), cache_vel);
+                         eskf_.SetX(SE3(last_state_->rotation, last_state_->translation), cache_vel);
                          Predict();
                          std::cout << ANSI_COLOR_YELLOW_BOLD << "imu is saturation,change to const velocity." << ANSI_COLOR_RESET << std::endl;
                          return true;
@@ -1234,20 +1272,20 @@ namespace zjloc
           else
           {
                //   use last pose
-               current_state->rotation_begin = all_state_frame[all_state_frame.size() - 1]->rotation;
-               current_state->translation_begin = all_state_frame[all_state_frame.size() - 1]->translation;
+               current_state->rotation_begin = last_state_->rotation;
+               current_state->translation_begin = last_state_->translation;
 
                //   TODO: add const velocity when imu is saturation
                if (saturationCheck())
                {
-                    current_state->rotation = (all_state_frame[all_state_frame.size() - 1]->rotation) *
-                                              (all_state_frame[all_state_frame.size() - 2]->rotation).inverse() *
-                                              (all_state_frame[all_state_frame.size() - 1]->rotation);
-                    current_state->translation = all_state_frame[all_state_frame.size() - 1]->translation +
-                                                 (all_state_frame[all_state_frame.size() - 1]->rotation) *
-                                                     (all_state_frame[all_state_frame.size() - 2]->rotation).inverse() *
-                                                     (all_state_frame[all_state_frame.size() - 1]->translation -
-                                                      all_state_frame[all_state_frame.size() - 2]->translation);
+                    current_state->rotation = last_state_->rotation *
+                                              prev_state_->rotation.inverse() *
+                                              last_state_->rotation;
+                    current_state->translation = last_state_->translation +
+                                                 last_state_->rotation *
+                                                     prev_state_->rotation.inverse() *
+                                                     (last_state_->translation -
+                                                      prev_state_->translation);
                }
                else
                {

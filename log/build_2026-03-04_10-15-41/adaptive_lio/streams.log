@@ -1,0 +1,138 @@
+[0.017s] Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio -DCMAKE_INSTALL_PREFIX=/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio
+[0.037s] -- Found ament_cmake: 1.3.12 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.158s] -- Found rclcpp: 16.0.17 (/opt/ros/humble/share/rclcpp/cmake)
+[0.176s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.177s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.181s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.187s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.195s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.216s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.217s] -- Found rmw_fastrtps_cpp: 6.2.9 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[0.285s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.321s] -- Found sensor_msgs: 4.9.0 (/opt/ros/humble/share/sensor_msgs/cmake)
+[0.340s] -- Found nav_msgs: 4.9.0 (/opt/ros/humble/share/nav_msgs/cmake)
+[0.350s] -- Found tf2: 0.25.18 (/opt/ros/humble/share/tf2/cmake)
+[0.353s] -- Found tf2_ros: 0.25.18 (/opt/ros/humble/share/tf2_ros/cmake)
+[0.404s] -- Found pcl_conversions: 2.4.5 (/opt/ros/humble/share/pcl_conversions/cmake)
+[0.427s] -- Eigen found (include: /usr/include/eigen3, version: 3.4.0)
+[0.464s] -- FLANN found (include: /usr/include, lib: /usr/lib/x86_64-linux-gnu/libflann_cpp.so)
+[0.712s] -- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)
+[0.719s] -- OpenNI2 found (version: 2.2.0.33, include: /usr/include/openni2, lib: /usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb)
+[0.840s] -- Eigen found (include: /usr/include/eigen3, version: 3.4.0)
+[0.846s] -- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)
+[0.851s] -- OpenNI2 found (version: 2.2.0.33, include: /usr/include/openni2, lib: /usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb)
+[0.984s] -- Found Qhull version 8.0.2
+[1.112s] -- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)
+[1.285s] -- Found livox_ros_driver2: 1.0.0 (/home/pace2204/livox_ws/install/livox_ros_driver2/share/livox_ros_driver2/cmake)
+[1.305s] -- Found std_srvs: 4.9.0 (/opt/ros/humble/share/std_srvs/cmake)
+[1.315s] CMake Warning (dev) at CMakeLists.txt:35 (find_package):
+[1.315s]   Policy CMP0074 is not set: find_package uses <PackageName>_ROOT variables.
+[1.315s]   Run "cmake --help-policy CMP0074" for policy details.  Use the cmake_policy
+[1.315s]   command to set the policy and suppress this warning.
+[1.315s] 
+[1.315s]   CMake variable PCL_ROOT is set to:
+[1.315s] 
+[1.315s]     /usr
+[1.315s] 
+[1.316s]   For compatibility, CMake is ignoring the variable.
+[1.316s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.316s] 
+[1.322s] -- Found required Ceres dependency: Eigen version 3.4.0 in /usr/include/eigen3
+[1.325s] -- Found required Ceres dependency: glog
+[1.325s] -- Found required Ceres dependency: gflags
+[1.326s] -- Found Ceres version: 2.0.0 installed in: /usr with components: [EigenSparse, SparseLinearAlgebraLibrary, LAPACK, SuiteSparse, CXSparse, SchurSpecializations, Multithreading]
+[1.331s] -- Found OpenCV: /usr (found version "4.5.4") 
+[1.334s] -- Found Glog: /usr/include  
+[1.736s] CMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.736s]   The package name passed to `find_package_handle_standard_args` (CSPARSE)
+[1.736s]   does not match the name of the calling package (CSparse).  This can lead to
+[1.736s]   problems in calling code that expects `find_package` result variables
+[1.736s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.736s] Call Stack (most recent call first):
+[1.736s]   cmake/FindCSparse.cmake:26 (find_package_handle_standard_args)
+[1.736s]   CMakeLists.txt:41 (find_package)
+[1.736s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.736s] 
+[1.736s] -- Found CSPARSE: /usr/include/suitesparse  
+[1.740s] CMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.740s]   The package name passed to `find_package_handle_standard_args` (CHOLMOD)
+[1.740s]   does not match the name of the calling package (Cholmod).  This can lead to
+[1.740s]   problems in calling code that expects `find_package` result variables
+[1.740s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.740s] Call Stack (most recent call first):
+[1.740s]   cmake/FindCholmod.cmake:91 (find_package_handle_standard_args)
+[1.740s]   CMakeLists.txt:42 (find_package)
+[1.740s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.740s] 
+[1.740s] -- Found CHOLMOD: /usr/include/suitesparse  
+[2.445s] -- Configuring done
+[2.498s] -- Generating done
+[2.513s] -- Build files have been written to: /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio
+[2.524s] Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio -DCMAKE_INSTALL_PREFIX=/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio
+[2.525s] Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
+[2.599s] [  5%] Building CXX object CMakeFiles/adaptive_lio.common.dir/src/common/utils_trans.cpp.o
+[2.600s] [ 15%] Building CXX object CMakeFiles/adaptive_lio.pre.dir/src/preprocess/cloud_convert/cloud_convert2.cc.o
+[2.600s] [ 15%] Building CXX object CMakeFiles/adaptive_lio.common.dir/src/common/utils.cpp.o
+[2.601s] [ 20%] Building CXX object CMakeFiles/adaptive_lio.common.dir/src/common/map.cpp.o
+[2.601s] [ 25%] Building CXX object CMakeFiles/adaptive_lio.common.dir/src/common/config.cpp.o
+[2.603s] [ 30%] Building CXX object CMakeFiles/adaptive_lio.common.dir/src/common/utility.cpp.o
+[2.604s] [ 35%] Building CXX object CMakeFiles/adaptive_lio.common.dir/src/common/timer/timer.cc.o
+[2.605s] [ 40%] Building CXX object CMakeFiles/adaptive_lio.common.dir/src/common/global_flags.cc.o
+[8.219s] [ 45%] Linking CXX static library libadaptive_lio.common.a
+[8.245s] [ 45%] Built target adaptive_lio.common
+[8.264s] [ 50%] Building CXX object CMakeFiles/adaptive_lio.algo.dir/src/algo/static_imu_init.cc.o
+[8.352s] [ 55%] Linking CXX static library libadaptive_lio.pre.a
+[8.374s] [ 55%] Built target adaptive_lio.pre
+[15.477s] [ 60%] Linking CXX static library libadaptive_lio.algo.a
+[15.537s] [ 60%] Built target adaptive_lio.algo
+[15.568s] [ 65%] Building CXX object CMakeFiles/adaptive_lio.lio.dir/src/lio/lidarodom.cpp.o
+[15.570s] [ 70%] Building CXX object CMakeFiles/adaptive_lio.lio.dir/src/lio/lio_utils.cpp.o
+[15.570s] [ 80%] Building CXX object CMakeFiles/adaptive_lio.lio.dir/src/lio/poseParameterization.cpp.o
+[15.570s] [ 80%] Building CXX object CMakeFiles/adaptive_lio.lio.dir/src/lio/lidarFactor.cpp.o
+[46.921s] [ 85%] Linking CXX static library libadaptive_lio.lio.a
+[46.971s] [ 85%] Built target adaptive_lio.lio
+[47.009s] [ 90%] Building CXX object CMakeFiles/adaptive_lio_node.dir/src/apps/main_ros2.cpp.o
+[47.013s] [ 95%] Building CXX object CMakeFiles/adaptive_lio_node.dir/src/apps/common_utility.cpp.o
+[65.626s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In destructor ‘AdaptiveLioNode::~AdaptiveLioNode()’:
+[65.626s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:262:23: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[65.626s]   262 |                 system(cmd.c_str());
+[65.626s]       |                 ~~~~~~^~~~~~~~~~~~~
+[65.928s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:
+[65.928s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:668:19: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[65.928s]   668 |             system(cmd.c_str());
+[65.929s]       |             ~~~~~~^~~~~~~~~~~~~
+[65.929s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:
+[65.929s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:747:19: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[65.929s]   747 |             system(cmd.c_str());
+[65.929s]       |             ~~~~~~^~~~~~~~~~~~~
+[65.931s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp: In lambda function:
+[65.931s] /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:597:19: warning: ignoring return value of ‘int system(const char*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+[65.931s]   597 |             system(cmd.c_str());
+[65.931s]       |             ~~~~~~^~~~~~~~~~~~~
+[77.197s] [100%] Linking CXX executable adaptive_lio_node
+[78.098s] [100%] Built target adaptive_lio_node
+[78.141s] Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
+[78.160s] Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio
+[78.178s] -- Install configuration: "Release"
+[78.178s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node
+[78.182s] -- Set runtime path of "/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/lib/adaptive_lio/adaptive_lio_node" to ""
+[78.183s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch
+[78.183s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/launch/run.launch.py
+[78.183s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config
+[78.183s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m.yaml
+[78.183s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/adaptive_lio.rviz
+[78.183s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/config/mapping_m copy.yaml
+[78.183s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/package_run_dependencies/adaptive_lio
+[78.183s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/parent_prefix_path/adaptive_lio
+[78.183s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/ament_prefix_path.dsv
+[78.183s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/environment/path.dsv
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.bash
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.sh
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.zsh
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/local_setup.dsv
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.dsv
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/ament_index/resource_index/packages/adaptive_lio
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig.cmake
+[78.184s] -- Installing: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/cmake/adaptive_lioConfig-version.cmake
+[78.184s] -- Up-to-date: /home/pace2204/copy/slam-mid360-volita/install/adaptive_lio/share/adaptive_lio/package.xml
+[78.187s] Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio

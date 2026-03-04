@@ -1,0 +1,2 @@
+Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': /usr/bin/cmake /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio -DCMAKE_INSTALL_PREFIX=/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio
+Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '1': /usr/bin/cmake /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio -DCMAKE_INSTALL_PREFIX=/home/pace2204/copy/slam-mid360-volita/install/adaptive_lio

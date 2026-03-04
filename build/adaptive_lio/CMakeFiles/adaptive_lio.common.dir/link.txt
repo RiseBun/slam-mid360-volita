@@ -1,0 +1,2 @@
+/usr/bin/ar qc libadaptive_lio.common.a CMakeFiles/adaptive_lio.common.dir/src/common/timer/timer.cc.o CMakeFiles/adaptive_lio.common.dir/src/common/utility.cpp.o CMakeFiles/adaptive_lio.common.dir/src/common/utils_trans.cpp.o CMakeFiles/adaptive_lio.common.dir/src/common/utils.cpp.o CMakeFiles/adaptive_lio.common.dir/src/common/global_flags.cc.o CMakeFiles/adaptive_lio.common.dir/src/common/map.cpp.o CMakeFiles/adaptive_lio.common.dir/src/common/config.cpp.o
+/usr/bin/ranlib libadaptive_lio.common.a

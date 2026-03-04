@@ -1,0 +1,2 @@
+/usr/bin/ar qc libadaptive_lio.algo.a CMakeFiles/adaptive_lio.algo.dir/src/algo/static_imu_init.cc.o
+/usr/bin/ranlib libadaptive_lio.algo.a

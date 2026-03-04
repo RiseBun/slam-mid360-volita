@@ -44,23 +44,30 @@ void MultipleResolutionVoxelMap::
 }
 
 void MultipleResolutionVoxelMap::RemoveElementsFarFromLocation(const Eigen::Vector3d &location, double distance)
-{ // Iterate over all voxels and suppress the voxels to remove
+{
+     double sq_distance = distance * distance;
      for (auto map_idx = 0; map_idx < voxel_maps_.size(); map_idx++)
      {
-          std::set<voxel> voxels_to_remove;
           auto &map = voxel_maps_[map_idx].map;
-          for (auto &pair : voxel_maps_[map_idx].map)
+          double resolution = options_.resolutions[map_idx].resolution;
+          auto it = map.begin();
+          while (it != map.end())
           {
-               if (pair.second.points.empty())
-                    voxels_to_remove.insert(pair.first);
-               if ((pair.second.points.front() - location).norm() > distance)
-                    voxels_to_remove.insert(pair.first);
-          }
-
-          for (auto &vox : voxels_to_remove)
-          {
-               voxel_maps_[map_idx].num_points -= map[vox].points.size();
-               map.erase(vox);
+               // Use voxel center coordinates for distance check (more accurate than front() point)
+               Eigen::Vector3d voxel_center(
+                   it->first.x * resolution + resolution * 0.5,
+                   it->first.y * resolution + resolution * 0.5,
+                   it->first.z * resolution + resolution * 0.5);
+               if (it->second.points.empty() ||
+                   (voxel_center - location).squaredNorm() > sq_distance)
+               {
+                    voxel_maps_[map_idx].num_points -= it->second.points.size();
+                    it = map.erase(it);
+               }
+               else
+               {
+                    ++it;
+               }
           }
      }
 }

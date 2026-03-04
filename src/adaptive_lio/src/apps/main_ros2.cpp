@@ -8,6 +8,7 @@
 #include <functional>
 #include <random>
 #include <atomic>
+#include <unordered_map>
 
 // ROS2 lib
 #include <rclcpp/rclcpp.hpp>
@@ -58,8 +59,8 @@ static inline builtin_interfaces::msg::Time fromSec(double t)
 class AdaptiveLioNode : public rclcpp::Node
 {
 public:
-    // Safe voxel downsample: shifts cloud centroid to origin before filtering
-    // to avoid PCL VoxelGrid int32 index overflow on large-extent maps.
+    // Hash-based voxel downsample: uses unordered_map to avoid int32 overflow
+    // that occurs with PCL VoxelGrid on large-extent maps.
     static bool safeVoxelDownsample(
         pcl::PointCloud<pcl::PointXYZI>::Ptr input,
         pcl::PointCloud<pcl::PointXYZI>::Ptr output,
@@ -68,38 +69,62 @@ public:
         if (!input || input->empty())
             return false;
 
-        // Compute centroid to shift coordinates near origin
-        Eigen::Vector4f centroid;
-        pcl::compute3DCentroid(*input, centroid);
+        output->clear();
+        output->reserve(input->size() / 4);  // rough estimate
 
-        // Shift input to origin (avoid int32 overflow in VoxelGrid hash)
-        for (auto &pt : input->points)
+        // Use hash map with voxel key (supports arbitrary coordinate range)
+        struct VoxelKey
         {
-            pt.x -= centroid[0];
-            pt.y -= centroid[1];
-            pt.z -= centroid[2];
+            int64_t x, y, z;
+            bool operator==(const VoxelKey &other) const
+            {
+                return x == other.x && y == other.y && z == other.z;
+            }
+        };
+        struct VoxelKeyHash
+        {
+            size_t operator()(const VoxelKey &k) const
+            {
+                // FNV-1a inspired hash
+                size_t h = 14695981039346656037ULL;
+                h ^= std::hash<int64_t>()(k.x);
+                h *= 1099511628211ULL;
+                h ^= std::hash<int64_t>()(k.y);
+                h *= 1099511628211ULL;
+                h ^= std::hash<int64_t>()(k.z);
+                return h;
+            }
+        };
+
+        float inv_leaf = 1.0f / leaf_size;
+        std::unordered_map<VoxelKey, pcl::PointXYZI, VoxelKeyHash> voxel_map;
+        voxel_map.reserve(input->size() / 4);
+
+        for (const auto &pt : input->points)
+        {
+            if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z))
+                continue;
+
+            VoxelKey key;
+            key.x = static_cast<int64_t>(std::floor(pt.x * inv_leaf));
+            key.y = static_cast<int64_t>(std::floor(pt.y * inv_leaf));
+            key.z = static_cast<int64_t>(std::floor(pt.z * inv_leaf));
+
+            // Keep first point in each voxel (simple but fast)
+            if (voxel_map.find(key) == voxel_map.end())
+            {
+                voxel_map[key] = pt;
+            }
         }
 
-        pcl::VoxelGrid<pcl::PointXYZI> vf;
-        vf.setInputCloud(input);
-        vf.setLeafSize(leaf_size, leaf_size, leaf_size);
-        vf.filter(*output);
-
-        // Shift filtered result back to world coordinates
-        for (auto &pt : output->points)
+        // Copy results to output
+        for (const auto &pair : voxel_map)
         {
-            pt.x += centroid[0];
-            pt.y += centroid[1];
-            pt.z += centroid[2];
+            output->points.push_back(pair.second);
         }
-
-        // Also restore input (it was modified in-place)
-        for (auto &pt : input->points)
-        {
-            pt.x += centroid[0];
-            pt.y += centroid[1];
-            pt.z += centroid[2];
-        }
+        output->width = output->size();
+        output->height = 1;
+        output->is_dense = true;
 
         return true;
     }
@@ -122,11 +147,22 @@ public:
         segment_index_ = 0;
         last_segment_position_ = Eigen::Vector3d::Zero();
         segment_initialized_ = false;
+        has_saved_any_data_ = false;  // Track if any data was saved
         max_map_points_ = 2000000;  // Hard limit: 2 million points (~64MB)
 
-        // config file
-        std::string config_file = std::string(ROOT_DIR) + "config/mapping_m.yaml";
-        RCLCPP_INFO(this->get_logger(), "config_file: %s", config_file.c_str());
+        // config file - support environment variable override
+        std::string config_file;
+        const char* env_config = std::getenv("ADAPTIVE_LIO_CONFIG");
+        if (env_config != nullptr && std::strlen(env_config) > 0)
+        {
+            config_file = env_config;
+            RCLCPP_INFO(this->get_logger(), "Using config from env: %s", config_file.c_str());
+        }
+        else
+        {
+            config_file = std::string(ROOT_DIR) + "config/mapping_m.yaml";
+            RCLCPP_INFO(this->get_logger(), "Using default config: %s", config_file.c_str());
+        }
 
         // init core algorithm
         lio_ = new zjloc::lidarodom_m();
@@ -273,12 +309,20 @@ public:
                     RCLCPP_INFO(this->get_logger(),
                                 "[Memory Management] Final segment %d saved: %s (%zu points, %.1fs)",
                                 segment_index_, segment_path.c_str(), global_map_->size(), elapsed_ms / 1000.0);
+                    has_saved_any_data_ = true;
                 }
             }
         }
 
-        // Merge all segments into final global_map.pcd
-        mergeAllSegments();
+        // Merge all segments into final global_map.pcd (only if we have data)
+        if (has_saved_any_data_)
+        {
+            mergeAllSegments();
+        }
+        else
+        {
+            RCLCPP_INFO(this->get_logger(), "[Memory Management] No data was processed, skipping merge");
+        }
 
         if (process_thread_.joinable())
             process_thread_.detach();
@@ -566,23 +610,32 @@ private:
             return;
         }
 
-        // Copy map under short lock (map is already downsampled during runtime)
-        pcl::PointCloud<pcl::PointXYZI>::Ptr map_copy;
-        size_t point_count;
+        // Wait for any pending segment save to finish
+        if (segment_save_thread_.joinable())
+            segment_save_thread_.join();
+
+        // Save current in-memory global_map_ as a new segment (if non-empty)
         {
             std::lock_guard<std::mutex> lock(map_mutex_);
-            if (global_map_->empty())
+            if (global_map_ && !global_map_->empty())
             {
-                response->success = false;
-                response->message = "Global map is empty, nothing to save.";
-                RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
-                return;
+                std::string cmd = "mkdir -p " + map_save_path_;
+                system(cmd.c_str());
+
+                std::string segment_path = map_save_path_ + "segment_" +
+                                           std::to_string(segment_index_) + ".pcd";
+                if (pcl::io::savePCDFileBinary(segment_path, *global_map_) == 0)
+                {
+                    RCLCPP_INFO(this->get_logger(),
+                                "[SaveMap] Flushed current buffer as segment_%d (%zu points)",
+                                segment_index_, global_map_->size());
+                }
+                // Do NOT increment segment_index_ or clear global_map_ here,
+                // so normal processing can continue accumulating into it.
+                // mergeAllSegments uses 0..segment_index_ inclusive, which now
+                // includes this just-saved buffer.
             }
-            map_copy.reset(new pcl::PointCloud<pcl::PointXYZI>(*global_map_));
-            point_count = map_copy->size();
         }
-        // No redundant voxel downsampling here - map is continuously downsampled
-        // during runtime every 5 frames, so it's already export-ready.
 
         save_in_progress_ = true;
 
@@ -590,35 +643,18 @@ private:
         if (save_thread_.joinable())
             save_thread_.join();
 
-        // Async PCD write in background thread
-        save_thread_ = std::thread([this, map_copy, point_count]()
+        // Merge all segments + current buffer into global_map.pcd in background
+        save_thread_ = std::thread([this]()
                                    {
-            std::string cmd = "mkdir -p " + map_save_path_;
-            system(cmd.c_str());
-
-            std::string pcd_path = map_save_path_ + "global_map.pcd";
-            auto start = std::chrono::steady_clock::now();
-            int ret = pcl::io::savePCDFileBinary(pcd_path, *map_copy);
-            auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now() - start)
-                                  .count();
-
-            if (ret == 0)
-            {
-                RCLCPP_INFO(this->get_logger(),
-                            "Map saved to %s (%zu points, %.1fs)",
-                            pcd_path.c_str(), point_count, elapsed_ms / 1000.0);
-            }
-            else
-            {
-                RCLCPP_ERROR(this->get_logger(), "Failed to save PCD to %s", pcd_path.c_str());
-            }
+            RCLCPP_INFO(this->get_logger(), "[SaveMap] Merging %d+1 segments into global_map.pcd...",
+                        segment_index_);
+            mergeAllSegments();
             save_in_progress_ = false; });
 
         response->success = true;
-        response->message = "Map save started asynchronously (" +
-                            std::to_string(point_count) + " points, no downsampling needed). "
-                                                          "Check /save_map_status for completion.";
+        response->message = "Map save started: merging " +
+                            std::to_string(segment_index_ + 1) +
+                            " segments. Check /save_map_status for completion.";
         RCLCPP_INFO(this->get_logger(), "%s", response->message.c_str());
     }
 
@@ -762,6 +798,7 @@ private:
                             "[Memory Management] Segment %d saved: %s (%zu points, %.1fs, trigger: %s, pos: %.1f,%.1f,%.1f)",
                             current_segment, segment_path.c_str(), point_count, elapsed_ms / 1000.0,
                             trigger_reason.c_str(), current_pos.x(), current_pos.y(), current_pos.z());
+                has_saved_any_data_ = true;
             }
             else
             {
@@ -821,6 +858,7 @@ private:
     int segment_index_;
     Eigen::Vector3d last_segment_position_;
     bool segment_initialized_;
+    bool has_saved_any_data_;  // Track if any data was actually processed
     std::thread segment_save_thread_;
     std::atomic<bool> segment_save_in_progress_{false};
 };

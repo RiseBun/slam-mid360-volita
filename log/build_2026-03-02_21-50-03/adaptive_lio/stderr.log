@@ -1,0 +1,48 @@
+[33mCMake Warning (dev) at CMakeLists.txt:35 (find_package):
+  Policy CMP0074 is not set: find_package uses <PackageName>_ROOT variables.
+  Run "cmake --help-policy CMP0074" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+
+  CMake variable PCL_ROOT is set to:
+
+    /usr
+
+  For compatibility, CMake is ignoring the variable.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+[0m
+[33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+  The package name passed to `find_package_handle_standard_args` (CSPARSE)
+  does not match the name of the calling package (CSparse).  This can lead to
+  problems in calling code that expects `find_package` result variables
+  (e.g., `_FOUND`) to follow a certain pattern.
+Call Stack (most recent call first):
+  cmake/FindCSparse.cmake:26 (find_package_handle_standard_args)
+  CMakeLists.txt:41 (find_package)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+[0m
+[33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+  The package name passed to `find_package_handle_standard_args` (CHOLMOD)
+  does not match the name of the calling package (Cholmod).  This can lead to
+  problems in calling code that expects `find_package` result variables
+  (e.g., `_FOUND`) to follow a certain pattern.
+Call Stack (most recent call first):
+  cmake/FindCholmod.cmake:91 (find_package_handle_standard_args)
+  CMakeLists.txt:42 (find_package)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+[0m
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:[m[K In destructor ‘[01m[KAdaptiveLioNode::~AdaptiveLioNode()[m[K’:
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:262:23:[m[K [01;35m[Kwarning: [m[Kignoring return value of ‘[01m[Kint system(const char*)[m[K’ declared with attribute ‘[01m[Kwarn_unused_result[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-result-Wunused-result]8;;[m[K]
+  262 |                 [01;35m[Ksystem(cmd.c_str())[m[K;
+      |                 [01;35m[K~~~~~~^~~~~~~~~~~~~[m[K
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:[m[K In lambda function:
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:668:19:[m[K [01;35m[Kwarning: [m[Kignoring return value of ‘[01m[Kint system(const char*)[m[K’ declared with attribute ‘[01m[Kwarn_unused_result[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-result-Wunused-result]8;;[m[K]
+  668 |             [01;35m[Ksystem(cmd.c_str())[m[K;
+      |             [01;35m[K~~~~~~^~~~~~~~~~~~~[m[K
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:[m[K In lambda function:
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:747:19:[m[K [01;35m[Kwarning: [m[Kignoring return value of ‘[01m[Kint system(const char*)[m[K’ declared with attribute ‘[01m[Kwarn_unused_result[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-result-Wunused-result]8;;[m[K]
+  747 |             [01;35m[Ksystem(cmd.c_str())[m[K;
+      |             [01;35m[K~~~~~~^~~~~~~~~~~~~[m[K
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:[m[K In lambda function:
+[01m[K/home/pace2204/slam-mid360-volita/src/adaptive_lio/src/apps/main_ros2.cpp:597:19:[m[K [01;35m[Kwarning: [m[Kignoring return value of ‘[01m[Kint system(const char*)[m[K’ declared with attribute ‘[01m[Kwarn_unused_result[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-result-Wunused-result]8;;[m[K]
+  597 |             [01;35m[Ksystem(cmd.c_str())[m[K;
+      |             [01;35m[K~~~~~~^~~~~~~~~~~~~[m[K

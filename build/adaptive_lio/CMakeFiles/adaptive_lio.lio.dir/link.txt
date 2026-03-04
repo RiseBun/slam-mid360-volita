@@ -1,0 +1,2 @@
+/usr/bin/ar qc libadaptive_lio.lio.a CMakeFiles/adaptive_lio.lio.dir/src/lio/poseParameterization.cpp.o CMakeFiles/adaptive_lio.lio.dir/src/lio/lidarFactor.cpp.o CMakeFiles/adaptive_lio.lio.dir/src/lio/lio_utils.cpp.o CMakeFiles/adaptive_lio.lio.dir/src/lio/lidarodom.cpp.o
+/usr/bin/ranlib libadaptive_lio.lio.a
