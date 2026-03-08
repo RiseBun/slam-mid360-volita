@@ -69,6 +69,10 @@ namespace zjloc
           // Ceres solver options
           int ceres_iterations = 5;  // default 5
           int ceres_threads = 3;     // default 3
+
+          // Multi-resolution map (mmap) toggle.
+          // When false, mmap is not updated, saving significant memory and CPU.
+          bool enable_mmap = false;
      };
 
      class lidarodom_m
@@ -79,7 +83,7 @@ namespace zjloc
 
           bool init(const std::string &config_yaml);
 
-          void pushData(std::vector<point3D>, std::pair<double, double> data);
+          void pushData(const std::vector<point3D> &msg, std::pair<double, double> data);
           void pushData(IMUPtr imu);
 
           void run();
@@ -165,6 +169,8 @@ namespace zjloc
           int index_frame = 1;
           lioOptions_m options_;
           ceres::Solver::Options solver_options_;
+          ceres::HuberLoss *huber_loss_ = nullptr;
+          ceres::EigenQuaternionParameterization *quaternion_parameterization_ = nullptr;
 
           CloudConvertInterface *convert = nullptr;
 

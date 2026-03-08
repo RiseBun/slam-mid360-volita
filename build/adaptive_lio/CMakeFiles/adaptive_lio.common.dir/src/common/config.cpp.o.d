@@ -1,7 +1,7 @@
 CMakeFiles/adaptive_lio.common.dir/src/common/config.cpp.o: \
- /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/common/config.cpp \
+ /home/pace2204/slam-mid360-volita/src/adaptive_lio/src/common/config.cpp \
  /usr/include/stdc-predef.h \
- /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/common/config.hpp \
+ /home/pace2204/slam-mid360-volita/src/adaptive_lio/src/common/config.hpp \
  /usr/include/c++/11/iostream \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h \
@@ -241,7 +241,7 @@ CMakeFiles/adaptive_lio.common.dir/src/common/config.cpp.o: \
  /usr/include/c++/11/bits/enable_special_members.h \
  /usr/include/c++/11/bits/unordered_map.h \
  /usr/include/yaml-cpp/node/parse.h /usr/include/yaml-cpp/node/emit.h \
- /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/src/tools/tool_color_printf.hpp \
+ /home/pace2204/slam-mid360-volita/src/adaptive_lio/src/tools/tool_color_printf.hpp \
  /usr/include/string.h /usr/include/strings.h \
  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
  /usr/include/x86_64-linux-gnu/bits/string_fortified.h

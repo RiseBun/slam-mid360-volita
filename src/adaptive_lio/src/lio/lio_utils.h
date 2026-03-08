@@ -82,6 +82,9 @@ namespace zjloc
           cloudFrame(std::vector<point3D> &point_surf_, std::vector<point3D> &const_surf_,
                      state *p_state_);
 
+          cloudFrame(std::vector<point3D> &&point_surf_, std::vector<point3D> &const_surf_,
+                     state *p_state_);
+
           cloudFrame(cloudFrame *p_cloud_frame);
 
           void release();

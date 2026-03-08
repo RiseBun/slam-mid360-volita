@@ -14,8 +14,8 @@ project(tessil-populate NONE)
 include(ExternalProject)
 ExternalProject_Add(tessil-populate
                      "UPDATE_DISCONNECTED" "False"
-                    SOURCE_DIR          "/home/pace2204/copy/slam-mid360-volita/src/adaptive_lio/thirdparty/tessil-src"
-                    BINARY_DIR          "/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio/_deps/tessil-build"
+                    SOURCE_DIR          "/home/pace2204/slam-mid360-volita/src/adaptive_lio/thirdparty/tessil-src"
+                    BINARY_DIR          "/home/pace2204/slam-mid360-volita/build/adaptive_lio/_deps/tessil-build"
                     CONFIGURE_COMMAND   ""
                     BUILD_COMMAND       ""
                     INSTALL_COMMAND     ""

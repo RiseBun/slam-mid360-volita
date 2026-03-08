@@ -57,10 +57,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio
+CMAKE_SOURCE_DIR = /home/pace2204/slam-mid360-volita/src/adaptive_lio
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio
+CMAKE_BINARY_DIR = /home/pace2204/slam-mid360-volita/build/adaptive_lio
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -142,9 +142,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio/CMakeFiles /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/pace2204/slam-mid360-volita/build/adaptive_lio/CMakeFiles /home/pace2204/slam-mid360-volita/build/adaptive_lio//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/pace2204/slam-mid360-volita/build/adaptive_lio/CMakeFiles 0
 .PHONY : all
 
 # The main clean target

@@ -36,6 +36,8 @@ namespace zjloc
      {
           delete prev_state_;
           delete last_state_;
+          delete huber_loss_;
+          delete quaternion_parameterization_;
      }
 
      void lidarodom_m::loadOptions()
@@ -75,6 +77,8 @@ namespace zjloc
                     options_.ceres_iterations = odometry_node["ceres_iterations"].as<int>();
                if (odometry_node["ceres_threads"])
                     options_.ceres_threads = odometry_node["ceres_threads"].as<int>();
+               if (odometry_node["enable_mmap"])
+                    options_.enable_mmap = odometry_node["enable_mmap"].as<bool>();
 
                std::string str_motion_compensation = odometry_node["motion_compensation"].as<std::string>();
                if (str_motion_compensation == "NONE")
@@ -216,10 +220,14 @@ namespace zjloc
           LOG(WARNING) << "Ceres solver: iterations=" << options_.ceres_iterations 
                        << ", threads=" << options_.ceres_threads;
 
+          // Pre-allocate reusable Ceres objects (ownership NOT taken by Problem)
+          huber_loss_ = new ceres::HuberLoss(0.5);
+          quaternion_parameterization_ = new ceres::EigenQuaternionParameterization();
+
           return true;
      }
 
-     void lidarodom_m::pushData(std::vector<point3D> msg, std::pair<double, double> data)
+     void lidarodom_m::pushData(const std::vector<point3D> &msg, std::pair<double, double> data)
      {
           if (data.first < last_timestamp_lidar_)
           {
@@ -314,9 +322,7 @@ namespace zjloc
                                          { stateInitialization(); },
                                          "state init");
 
-          std::vector<point3D> const_surf;
-          const_surf.insert(const_surf.end(), meas.lidar_.begin(), meas.lidar_.end());
-          // const_surf.assign(meas.lidar_.begin(), meas.lidar_.end());
+          std::vector<point3D> const_surf = std::move(meas.lidar_);
 
           cloudFrame *p_frame;
           zjloc::common::Timer::Evaluate([&]()
@@ -366,6 +372,7 @@ namespace zjloc
                } },
                                          "pub cloud");
 
+          delete p_frame->p_state;
           p_frame->p_state = new state(current_state, true);
           delete prev_state_;
           prev_state_ = last_state_;
@@ -386,8 +393,8 @@ namespace zjloc
                {
                     double rss_mb = getRSSMB();
                     size_t voxel_count = voxel_map.size();
-                    size_t mmap_voxels = mmap->TotalVoxelCount();
-                    size_t mmap_points = mmap->NumPoints();
+                    size_t mmap_voxels = options_.enable_mmap ? mmap->TotalVoxelCount() : 0;
+                    size_t mmap_points = options_.enable_mmap ? mmap->NumPoints() : 0;
 
                     std::cout << ANSI_COLOR_CYAN
                               << "[MONITOR] frame=" << index_frame
@@ -402,7 +409,7 @@ namespace zjloc
 
           index_frame++;
           p_frame->release();
-          std::vector<point3D>().swap(meas.lidar_);
+          delete p_frame;
           std::vector<point3D>().swap(const_surf);
      }
 
@@ -497,23 +504,22 @@ namespace zjloc
           {
                transformKeypoints(surf_keypoints);
 
-               // ceres::LossFunction *loss_function = new ceres::HuberLoss(0.1 / (1.5e-3));
-               ceres::LossFunction *loss_function = new ceres::HuberLoss(0.5);
+               // Reuse pre-allocated loss function and parameterization
                ceres::Problem::Options problem_options;
+               problem_options.loss_function_ownership = ceres::DO_NOT_TAKE_OWNERSHIP;
+               problem_options.local_parameterization_ownership = ceres::DO_NOT_TAKE_OWNERSHIP;
                ceres::Problem problem(problem_options);
-
-               auto *parameterization = new ceres::EigenQuaternionParameterization();
 
                switch (options_.icpmodel)
                {
                case IcpModel::CT_POINT_TO_PLANE:
-                    problem.AddParameterBlock(&begin_quat.x(), 4, parameterization);
-                    problem.AddParameterBlock(&end_quat.x(), 4, parameterization);
+                    problem.AddParameterBlock(&begin_quat.x(), 4, quaternion_parameterization_);
+                    problem.AddParameterBlock(&end_quat.x(), 4, quaternion_parameterization_);
                     problem.AddParameterBlock(&begin_t.x(), 3);
                     problem.AddParameterBlock(&end_t.x(), 3);
                     break;
                case IcpModel::POINT_TO_PLANE:
-                    problem.AddParameterBlock(&end_quat.x(), 4, parameterization);
+                    problem.AddParameterBlock(&end_quat.x(), 4, quaternion_parameterization_);
                     problem.AddParameterBlock(&end_t.x(), 3);
                     break;
                }
@@ -535,10 +541,10 @@ namespace zjloc
                     switch (options_.icpmodel)
                     {
                     case IcpModel::CT_POINT_TO_PLANE:
-                         problem.AddResidualBlock(e, loss_function, &begin_t.x(), &begin_quat.x(), &end_t.x(), &end_quat.x());
+                         problem.AddResidualBlock(e, huber_loss_, &begin_t.x(), &begin_quat.x(), &end_t.x(), &end_quat.x());
                          break;
                     case IcpModel::POINT_TO_PLANE:
-                         problem.AddResidualBlock(e, loss_function, &end_t.x(), &end_quat.x());
+                         problem.AddResidualBlock(e, huber_loss_, &end_t.x(), &end_quat.x());
                          break;
                     }
                     // if (surf_num > options_.max_num_residuals)
@@ -1157,7 +1163,8 @@ namespace zjloc
                              options_.size_voxel_map, options_.max_num_points_in_voxel,
                              options_.min_distance_points, min_num_points, p_frame);
 
-               mmap->InsertPoint(point);
+               if (options_.enable_mmap)
+                    mmap->InsertPoint(point);
           }
 
           {
@@ -1184,7 +1191,8 @@ namespace zjloc
           for (auto &vox : voxels_to_erase)
                voxel_map.erase(vox);
 
-          mmap->RemoveElementsFarFromLocation(location, options_.max_distance);
+          if (options_.enable_mmap)
+               mmap->RemoveElementsFarFromLocation(location, options_.max_distance);
      }
 
      cloudFrame *lidarodom_m::buildFrame(std::vector<point3D> &const_surf, state *cur_state,
@@ -1207,7 +1215,7 @@ namespace zjloc
                               cur_state->rotation, cur_state->translation_begin, cur_state->translation,
                               R_imu_lidar, t_imu_lidar);
 
-          cloudFrame *p_frame = new cloudFrame(frame_surf, const_surf, cur_state);
+          cloudFrame *p_frame = new cloudFrame(std::move(frame_surf), const_surf, cur_state);
 
           p_frame->time_frame_begin = timestamp_begin;
           p_frame->time_frame_end = timestamp_end;

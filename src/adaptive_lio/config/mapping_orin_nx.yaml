@@ -1,4 +1,4 @@
-YAML: 1.0
+%YAML 1.2
 # Orin NX 16GB 优化配置
 # 相比默认配置，降低了计算复杂度和内存占用，以适应 ARM 平台
 
@@ -80,3 +80,5 @@ odometry:
 
   satu_acc: 19.5
   satu_gyro: 16
+
+  enable_mmap: false  # Multi-resolution map disabled (saves 50-200MB on edge devices)

@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio
+CMAKE_SOURCE_DIR = /home/pace2204/slam-mid360-volita/src/adaptive_lio
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio
+CMAKE_BINARY_DIR = /home/pace2204/slam-mid360-volita/build/adaptive_lio
 
 # Utility rule file for adaptive_lio_uninstall.
 
@@ -67,7 +67,7 @@ include CMakeFiles/adaptive_lio_uninstall.dir/compiler_depend.make
 include CMakeFiles/adaptive_lio_uninstall.dir/progress.make
 
 CMakeFiles/adaptive_lio_uninstall:
-	/usr/bin/cmake -P /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
+	/usr/bin/cmake -P /home/pace2204/slam-mid360-volita/build/adaptive_lio/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
 
 adaptive_lio_uninstall: CMakeFiles/adaptive_lio_uninstall
 adaptive_lio_uninstall: CMakeFiles/adaptive_lio_uninstall.dir/build.make
@@ -82,6 +82,6 @@ CMakeFiles/adaptive_lio_uninstall.dir/clean:
 .PHONY : CMakeFiles/adaptive_lio_uninstall.dir/clean
 
 CMakeFiles/adaptive_lio_uninstall.dir/depend:
-	cd /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio /home/pace2204/copy/slam-mid360-volita/src/adaptive_lio /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio/CMakeFiles/adaptive_lio_uninstall.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/pace2204/slam-mid360-volita/build/adaptive_lio && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/pace2204/slam-mid360-volita/src/adaptive_lio /home/pace2204/slam-mid360-volita/src/adaptive_lio /home/pace2204/slam-mid360-volita/build/adaptive_lio /home/pace2204/slam-mid360-volita/build/adaptive_lio /home/pace2204/slam-mid360-volita/build/adaptive_lio/CMakeFiles/adaptive_lio_uninstall.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/adaptive_lio_uninstall.dir/depend
 

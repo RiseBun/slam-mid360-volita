@@ -1,4 +1,4 @@
-# Install script for directory: /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio/_deps/tessil-subbuild
+# Install script for directory: /home/pace2204/slam-mid360-volita/build/adaptive_lio/_deps/tessil-subbuild
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio/_deps/tessil-subbuild/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/pace2204/slam-mid360-volita/build/adaptive_lio/_deps/tessil-subbuild/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

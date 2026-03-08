@@ -54,19 +54,8 @@ void sub_sample_frame(std::vector<point3D> &frame, double size_voxel)
 
 void grid_sampling(const std::vector<point3D> &frame, std::vector<point3D> &keypoints, double size_voxel_subsampling)
 {
-     keypoints.clear();
-     std::vector<point3D> frame_sub;
-     frame_sub.resize(frame.size());
-     for (int i = 0; i < (int)frame_sub.size(); i++)
-     {
-          frame_sub[i] = frame[i];
-     }
-     sub_sample_frame(frame_sub, size_voxel_subsampling);
-     keypoints.reserve(frame_sub.size());
-     for (int i = 0; i < (int)frame_sub.size(); i++)
-     {
-          keypoints.push_back(frame_sub[i]);
-     }
+     keypoints.assign(frame.begin(), frame.end());
+     sub_sample_frame(keypoints, size_voxel_subsampling);
 }
 
 
@@ -94,19 +83,8 @@ void subSampleFrame(std::vector<point3D> &frame, double size_voxel)
 
 void gridSampling(const std::vector<point3D> &frame, std::vector<point3D> &keypoints, double size_voxel_subsampling)
 {
-     keypoints.resize(0);
-     std::vector<point3D> frame_sub;
-     frame_sub.resize(frame.size());
-     for (int i = 0; i < (int)frame_sub.size(); i++)
-     {
-          frame_sub[i] = frame[i];
-     }
-     subSampleFrame(frame_sub, size_voxel_subsampling);
-     keypoints.reserve(frame_sub.size());
-     for (int i = 0; i < (int)frame_sub.size(); i++)
-     {
-          keypoints.push_back(frame_sub[i]);
-     }
+     keypoints.assign(frame.begin(), frame.end());
+     subSampleFrame(keypoints, size_voxel_subsampling);
 }
 
 void distortFrame(std::vector<point3D> &points, Eigen::Quaterniond &q_begin, Eigen::Quaterniond &q_end, Eigen::Vector3d &t_begin, Eigen::Vector3d &t_end,

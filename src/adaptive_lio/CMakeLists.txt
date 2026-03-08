@@ -59,8 +59,8 @@ else()
   add_definitions(-DMP_PROC_NUM=1)
 endif()
 
-# ROOT_DIR macro for config file path
-add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
+# ament_index_cpp for runtime package path resolution
+find_package(ament_index_cpp REQUIRED)
 
 # ========================
 # Include directories
@@ -186,6 +186,7 @@ ament_target_dependencies(adaptive_lio_node
   pcl_conversions
   livox_ros_driver2
   std_srvs
+  ament_index_cpp
 )
 
 # ========================

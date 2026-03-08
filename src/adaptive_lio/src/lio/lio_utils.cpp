@@ -62,6 +62,17 @@ namespace zjloc
           success = true;
      }
 
+     cloudFrame::cloudFrame(std::vector<point3D> &&point_surf_, std::vector<point3D> &const_surf_,
+                            state *p_state_)
+     {
+          point_surf = std::move(point_surf_);
+          const_surf.insert(const_surf.end(), const_surf_.begin(), const_surf_.end());
+
+          p_state = new state(p_state_, true);
+
+          success = true;
+     }
+
      cloudFrame::cloudFrame(cloudFrame *p_cloud_frame)
      {
           time_frame_begin = p_cloud_frame->time_frame_begin;
@@ -86,6 +97,7 @@ namespace zjloc
           std::vector<point3D>().swap(point_surf);
           std::vector<point3D>().swap(const_surf);
 
+          delete p_state;
           p_state = nullptr;
      }
 }

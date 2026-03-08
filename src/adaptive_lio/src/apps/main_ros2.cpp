@@ -37,11 +37,43 @@
 #include <glog/logging.h>
 #include <yaml-cpp/yaml.h>
 
+// Runtime package path resolution (replaces compile-time ROOT_DIR)
+#include <ament_index_cpp/get_package_share_directory.hpp>
+#include <filesystem>
+
 #include "common/utility.h"
 #include "preprocess/cloud_convert/cloud_convert2.h"
 #include "lio/lidarodom.h"
+#include "tools/saveTrajectory.hpp"
 
-#define DEBUG_FILE_DIR(name) (std::string(std::string(ROOT_DIR) + "log/" + name))
+// Resolve the package source directory at runtime.
+// With --symlink-install, individual files inside config/ are symlinks to the source tree,
+// so we resolve one to find the actual source root.
+static std::string get_package_root_dir()
+{
+    std::string share_dir = ament_index_cpp::get_package_share_directory("adaptive_lio");
+    std::filesystem::path config_dir = std::filesystem::path(share_dir) / "config";
+    try
+    {
+        for (auto const& entry : std::filesystem::directory_iterator(config_dir))
+        {
+            if (std::filesystem::is_symlink(entry.path()))
+            {
+                // e.g. install/.../config/mapping_m.yaml -> <source>/config/mapping_m.yaml
+                std::filesystem::path resolved = std::filesystem::canonical(entry.path());
+                // resolved = <source>/config/mapping_m.yaml  =>  parent.parent = <source>/
+                return resolved.parent_path().parent_path().string() + "/";
+            }
+        }
+    }
+    catch (...)
+    {
+    }
+    // Fallback: use share directory (non-symlink install)
+    return share_dir + "/";
+}
+
+#define DEBUG_FILE_DIR(name) (get_package_root_dir() + "log/" + (name))
 
 static inline double toSec(const builtin_interfaces::msg::Time &stamp)
 {
@@ -138,7 +170,7 @@ public:
 
         // global map (kept continuously downsampled for fast export)
         global_map_.reset(new pcl::PointCloud<pcl::PointXYZI>());
-        map_save_path_ = std::string(ROOT_DIR) + "map/";
+        map_save_path_ = get_package_root_dir() + "map/";
         global_map_frame_count_ = 0;
         global_map_downsample_interval_ = 5;  // downsample every 5 frames (was 50)
 
@@ -148,7 +180,26 @@ public:
         last_segment_position_ = Eigen::Vector3d::Zero();
         segment_initialized_ = false;
         has_saved_any_data_ = false;  // Track if any data was saved
+        last_merged_segment_index_ = -1;  // No manual merge done yet
         max_map_points_ = 2000000;  // Hard limit: 2 million points (~64MB)
+
+        // Open trajectory file for TUM format output
+        {
+            std::string traj_dir = map_save_path_;
+            std::string mkdir_cmd = "mkdir -p " + traj_dir;
+            system(mkdir_cmd.c_str());
+            std::string traj_path = traj_dir + "trajectory.txt";
+            traj_fout_.open(traj_path, std::ios::out);
+            if (traj_fout_.is_open())
+            {
+                traj_fout_ << "# TUM format: timestamp tx ty tz qx qy qz qw" << std::endl;
+                RCLCPP_INFO(this->get_logger(), "Trajectory file: %s", traj_path.c_str());
+            }
+            else
+            {
+                RCLCPP_WARN(this->get_logger(), "Failed to open trajectory file: %s", traj_path.c_str());
+            }
+        }
 
         // config file - support environment variable override
         std::string config_file;
@@ -160,7 +211,7 @@ public:
         }
         else
         {
-            config_file = std::string(ROOT_DIR) + "config/mapping_m.yaml";
+            config_file = get_package_root_dir() + "config/mapping_m.yaml";
             RCLCPP_INFO(this->get_logger(), "Using default config: %s", config_file.c_str());
         }
 
@@ -266,26 +317,15 @@ public:
             std::bind(&AdaptiveLioNode::saveMapStatusCallback, this,
                       std::placeholders::_1, std::placeholders::_2));
 
-        // Streaming snapshot timer: writes map to disk every 30 seconds in background
-        snapshot_timer_ = this->create_wall_timer(
-            std::chrono::seconds(30),
-            std::bind(&AdaptiveLioNode::snapshotTimerCallback, this));
-        RCLCPP_INFO(this->get_logger(), "Streaming snapshot enabled (every 30s)");
-
         // Start processing thread
         process_thread_ = std::thread(&zjloc::lidarodom_m::run, lio_);
     }
 
     ~AdaptiveLioNode()
     {
-        // Stop streaming snapshot timer
-        snapshot_timer_.reset();
-
-        // Wait for any background save/snapshot/segment threads to finish
+        // Wait for any background save/segment threads to finish
         if (save_thread_.joinable())
             save_thread_.join();
-        if (snapshot_thread_.joinable())
-            snapshot_thread_.join();
         if (segment_save_thread_.joinable())
             segment_save_thread_.join();
 
@@ -314,10 +354,20 @@ public:
             }
         }
 
-        // Merge all segments into final global_map.pcd (only if we have data)
+        // Merge all segments into final global_map.pcd (only if we have data and merge is needed)
         if (has_saved_any_data_)
         {
-            mergeAllSegments();
+            // Skip merge if we already did a manual save and no new segments were created
+            if (last_merged_segment_index_ >= 0 && segment_index_ == last_merged_segment_index_)
+            {
+                RCLCPP_INFO(this->get_logger(),
+                            "[Memory Management] Skipping redundant merge (already merged up to segment_%d)",
+                            last_merged_segment_index_);
+            }
+            else
+            {
+                mergeAllSegments();
+            }
         }
         else
         {
@@ -328,7 +378,19 @@ public:
             process_thread_.detach();
 
         zjloc::common::Timer::PrintAll();
+        {
+            std::string log_dir = get_package_root_dir() + "log/";
+            std::string mkdir_cmd = "mkdir -p " + log_dir;
+            system(mkdir_cmd.c_str());
+        }
         zjloc::common::Timer::DumpIntoFile(DEBUG_FILE_DIR("log_time.txt"));
+
+        // Close trajectory file
+        if (traj_fout_.is_open())
+        {
+            traj_fout_.close();
+            RCLCPP_INFO(this->get_logger(), "Trajectory saved to: %strajectory.txt", map_save_path_.c_str());
+        }
 
         if (lio_)
             delete lio_;
@@ -493,8 +555,21 @@ private:
                     laser_pose.pose = odom.pose.pose;
                     laser_odo_path_.header.stamp = odom.header.stamp;
                     laser_odo_path_.poses.push_back(laser_pose);
+                    // Sliding window: keep only recent poses to bound memory and serialization cost
+                    const size_t kMaxPathPoses = 5000;
+                    if (laser_odo_path_.poses.size() > kMaxPathPoses)
+                        laser_odo_path_.poses.erase(laser_odo_path_.poses.begin());
                     laser_odo_path_.header.frame_id = "map";
                     pub_path_->publish(laser_odo_path_);
+
+                    // Save trajectory in TUM format
+                    if (traj_fout_.is_open())
+                    {
+                        std::string stamp_str = std::to_string(stamp);
+                        zjloc::saveTrajectoryTUMformat(traj_fout_, stamp_str,
+                                                       current_pos.x(), current_pos.y(), current_pos.z(),
+                                                       q_current.x(), q_current.y(), q_current.z(), q_current.w());
+                    }
 
                     // Check if we need to save segment and clear memory
                     checkAndSaveSegment(current_pos);
@@ -649,6 +724,7 @@ private:
             RCLCPP_INFO(this->get_logger(), "[SaveMap] Merging %d+1 segments into global_map.pcd...",
                         segment_index_);
             mergeAllSegments();
+            last_merged_segment_index_ = segment_index_;  // Record that we merged up to this segment
             save_in_progress_ = false; });
 
         response->success = true;
@@ -672,51 +748,6 @@ private:
             response->success = true;
             response->message = "No save in progress. Last save completed.";
         }
-    }
-
-    void snapshotTimerCallback()
-    {
-        // Skip if a snapshot write is already running
-        if (snapshot_in_progress_.load())
-            return;
-
-        // Copy map under short lock
-        pcl::PointCloud<pcl::PointXYZI>::Ptr map_copy;
-        size_t point_count;
-        {
-            std::lock_guard<std::mutex> lock(map_mutex_);
-            if (!global_map_ || global_map_->empty())
-                return;
-            map_copy.reset(new pcl::PointCloud<pcl::PointXYZI>(*global_map_));
-            point_count = map_copy->size();
-        }
-
-        snapshot_in_progress_ = true;
-
-        // Join previous snapshot thread if it finished
-        if (snapshot_thread_.joinable())
-            snapshot_thread_.join();
-
-        // Write snapshot in background thread
-        snapshot_thread_ = std::thread([this, map_copy, point_count]()
-                                       {
-            std::string cmd = "mkdir -p " + map_save_path_;
-            system(cmd.c_str());
-
-            std::string snapshot_path = map_save_path_ + "global_map_snapshot.pcd";
-            auto start = std::chrono::steady_clock::now();
-            int ret = pcl::io::savePCDFileBinary(snapshot_path, *map_copy);
-            auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now() - start)
-                                  .count();
-
-            if (ret == 0)
-            {
-                RCLCPP_INFO(this->get_logger(),
-                            "Snapshot saved: %s (%zu points, %.1fs)",
-                            snapshot_path.c_str(), point_count, elapsed_ms / 1000.0);
-            }
-            snapshot_in_progress_ = false; });
     }
 
     // Check distance traveled and save map segment if threshold exceeded
@@ -847,11 +878,6 @@ private:
     std::thread save_thread_;
     std::atomic<bool> save_in_progress_{false};
 
-    // Streaming snapshot
-    rclcpp::TimerBase::SharedPtr snapshot_timer_;
-    std::thread snapshot_thread_;
-    std::atomic<bool> snapshot_in_progress_{false};
-
     // Segmented map saving for memory management
     double segment_distance_threshold_;  // meters
     size_t max_map_points_;              // hard limit on points in memory
@@ -859,8 +885,12 @@ private:
     Eigen::Vector3d last_segment_position_;
     bool segment_initialized_;
     bool has_saved_any_data_;  // Track if any data was actually processed
+    int last_merged_segment_index_;  // Track last manually merged segment to avoid redundant merge
     std::thread segment_save_thread_;
     std::atomic<bool> segment_save_in_progress_{false};
+
+    // Trajectory saving
+    std::fstream traj_fout_;
 };
 
 int main(int argc, char **argv)

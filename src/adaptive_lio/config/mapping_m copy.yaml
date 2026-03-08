@@ -1,4 +1,4 @@
-YAML: 1.0
+%YAML 1.2
 
 preprocess:
   point_filter_num: 1

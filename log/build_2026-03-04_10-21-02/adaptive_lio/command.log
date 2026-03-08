@@ -1,4 +1,0 @@
-Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
-Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio -- -j20 -l20
-Invoking command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio
-Invoked command in '/home/pace2204/copy/slam-mid360-volita/build/adaptive_lio' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/pace2204/copy/slam-mid360-volita/build/adaptive_lio

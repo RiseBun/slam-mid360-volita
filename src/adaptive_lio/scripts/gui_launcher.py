@@ -18,13 +18,19 @@ import time
 import re
 from pathlib import Path
 from datetime import datetime
+from collections import deque
+
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class AdaptiveLioLauncher:
     def __init__(self, root):
         self.root = root
         self.root.title("Adaptive-LIO ROS2 控制面板")
-        self.root.geometry("920x720")
+        self.root.geometry("980x760")
         self.root.resizable(True, True)
 
         # 进程管理
@@ -49,11 +55,28 @@ class AdaptiveLioLauncher:
         self.is_playing = False
         self.frame_count = 0
 
+        # Orin 优化模式
+        self.orin_mode_var = tk.BooleanVar(value=False)
+        self.orin_config_path = self.ws_path / "config" / "mapping_orin_nx.yaml"
+
+        # 资源监控数据缓冲
+        self.monitor_data = {
+            'frame': deque(maxlen=300),
+            'frame_ms': deque(maxlen=300),
+            'rss': deque(maxlen=300),
+            'voxel_map': deque(maxlen=300),
+            'mmap_voxels': deque(maxlen=300),
+            'mmap_points': deque(maxlen=300),
+        }
+        self.graph_needs_update = False
+        self._save_map_event = threading.Event()  # 用于等待地图合并完成
+
         # 创建界面
         self.create_widgets()
 
         # 启动时检查环境
         self.root.after(500, self.check_environment)
+        self.root.after(1500, self.update_resource_graph)
 
     def create_widgets(self):
         """创建所有界面组件"""
@@ -99,7 +122,7 @@ class AdaptiveLioLauncher:
         left_frame = ttk.Frame(tab)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        right_frame = ttk.Frame(tab, width=280)
+        right_frame = ttk.Frame(tab, width=310)
         right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
         right_frame.pack_propagate(False)
 
@@ -127,6 +150,14 @@ class AdaptiveLioLauncher:
 
         self.btn_rviz = ttk.Button(btn_row2, text="启动RViz2", command=self.start_rviz, width=10)
         self.btn_rviz.pack(side=tk.LEFT, padx=3)
+
+        # Orin NX 优化模式选项
+        orin_row = ttk.Frame(ctrl_frame)
+        orin_row.pack(fill=tk.X, pady=3)
+        ttk.Checkbutton(orin_row, text="Orin NX 优化模式",
+                        variable=self.orin_mode_var).pack(side=tk.LEFT, padx=3)
+        ttk.Label(orin_row, text="(16GB边缘平台优化)",
+                  foreground='gray', font=('', 8)).pack(side=tk.LEFT)
 
         # 节点状态指示
         status_row = ttk.Frame(ctrl_frame)
@@ -167,7 +198,7 @@ class AdaptiveLioLauncher:
 
         rec_row = ttk.Frame(record_frame)
         rec_row.pack(fill=tk.X, pady=2)
-        self.record_path_var = tk.StringVar(value="/home/li/rosbag")
+        self.record_path_var = tk.StringVar(value=str(Path.home() / "rosbag"))
         ttk.Entry(rec_row, textvariable=self.record_path_var, width=40).pack(side=tk.LEFT, padx=3)
         ttk.Button(rec_row, text="浏览", command=self.browse_record_path, width=6).pack(side=tk.LEFT)
 
@@ -199,62 +230,60 @@ class AdaptiveLioLauncher:
         self.save_status_label = ttk.Label(save_btn_row, text="", foreground='gray')
         self.save_status_label.pack(side=tk.LEFT, padx=10)
 
-        # ===== 右侧：实时状态监控 =====
+        # ===== 右侧：实时资源监控 =====
 
-        # 算法统计
-        stats_frame = ttk.LabelFrame(right_frame, text="算法统计", padding="8")
-        stats_frame.pack(fill=tk.X, pady=5)
+        # Matplotlib 资源监控图表
+        self.fig = Figure(figsize=(3.4, 3.2), dpi=82, facecolor='#fafafa')
+        self.ax_framems = self.fig.add_subplot(211)
+        self.ax_rss = self.fig.add_subplot(212)
 
-        self.stats_labels = {}
-        stats_items = [
-            ('frames', '处理帧数', '0'),
-            ('build', '建帧耗时', '-- ms'),
-            ('optimize', '优化耗时', '-- ms'),
-            ('pose', '位姿估计', '-- ms'),
+        for ax in [self.ax_framems, self.ax_rss]:
+            ax.set_facecolor('white')
+            ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            ax.tick_params(labelsize=7)
+
+        self.ax_framems.set_ylabel('Frame Time (ms)', fontsize=8)
+        self.ax_framems.set_title('Real-time Resource Monitor', fontsize=9,
+                                  fontweight='bold')
+        self.ax_rss.set_ylabel('RSS Memory (MB)', fontsize=8)
+        self.ax_rss.set_xlabel('Frame Index', fontsize=8)
+        self.fig.tight_layout(pad=1.5)
+
+        self.canvas_fig = FigureCanvasTkAgg(self.fig, master=right_frame)
+        self.canvas_fig.get_tk_widget().pack(fill=tk.BOTH, expand=True, pady=(0, 3))
+
+        # 当前指标数值
+        values_frame = ttk.LabelFrame(right_frame, text="当前指标", padding="4")
+        values_frame.pack(fill=tk.X, pady=2)
+
+        self.monitor_labels = {}
+        monitor_items = [
+            ('frame_ms', '帧耗时', '-- ms'),
+            ('rss', 'RSS内存', '-- MB'),
+            ('voxel_map', '体素数', '--'),
+            ('mmap_info', 'MMap', '--'),
         ]
-        for key, name, default in stats_items:
-            row = ttk.Frame(stats_frame)
-            row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=f"{name}:", width=10).pack(side=tk.LEFT)
-            self.stats_labels[key] = ttk.Label(row, text=default, foreground='blue', width=12, anchor='e')
-            self.stats_labels[key].pack(side=tk.RIGHT)
+        for key, name, default in monitor_items:
+            row = ttk.Frame(values_frame)
+            row.pack(fill=tk.X, pady=1)
+            ttk.Label(row, text=f"{name}:", width=8, font=('', 8)).pack(side=tk.LEFT)
+            self.monitor_labels[key] = ttk.Label(
+                row, text=default, foreground='#1565C0',
+                width=16, anchor='e', font=('', 8))
+            self.monitor_labels[key].pack(side=tk.RIGHT)
 
-        # 位姿信息
-        pose_frame = ttk.LabelFrame(right_frame, text="当前位姿", padding="8")
-        pose_frame.pack(fill=tk.X, pady=5)
+        # 资源紧张度指示器
+        tightness_frame = ttk.LabelFrame(right_frame, text="资源紧张度", padding="4")
+        tightness_frame.pack(fill=tk.X, pady=2)
 
-        self.pose_labels = {}
-        for key, name in [('vel', '速度'), ('dist', '里程')]:
-            row = ttk.Frame(pose_frame)
-            row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=f"{name}:", width=10).pack(side=tk.LEFT)
-            self.pose_labels[key] = ttk.Label(row, text="--", foreground='green', width=12, anchor='e')
-            self.pose_labels[key].pack(side=tk.RIGHT)
-
-        # 地图信息
-        map_info_frame = ttk.LabelFrame(right_frame, text="配置信息", padding="8")
-        map_info_frame.pack(fill=tk.X, pady=5)
-
-        self.map_info_labels = {}
-        map_items = [
-            ('icp_model', 'ICP模型', '--'),
-            ('voxel_size', '体素大小', '-- m'),
-            ('max_iter', '最大迭代', '--'),
-        ]
-        for key, name, default in map_items:
-            row = ttk.Frame(map_info_frame)
-            row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=f"{name}:", width=10).pack(side=tk.LEFT)
-            self.map_info_labels[key] = ttk.Label(row, text=default, foreground='purple', width=12, anchor='e')
-            self.map_info_labels[key].pack(side=tk.RIGHT)
-
-        # 快捷操作
-        quick_frame = ttk.LabelFrame(right_frame, text="快捷操作", padding="8")
-        quick_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Button(quick_frame, text="打开地图目录", command=self.open_map_folder, width=15).pack(pady=2)
-        ttk.Button(quick_frame, text="刷新配置显示", command=self.reload_config_display, width=15).pack(pady=2)
-        ttk.Button(quick_frame, text="打开配置文件", command=self.open_config_file, width=15).pack(pady=2)
+        self.tightness_label = ttk.Label(
+            tightness_frame, text="等待数据...",
+            font=('', 10, 'bold'), foreground='gray')
+        self.tightness_label.pack()
+        self.tightness_detail = ttk.Label(
+            tightness_frame, text="",
+            font=('', 7), foreground='gray')
+        self.tightness_detail.pack()
 
     # ==================== 参数调节标签页 ====================
     def create_param_tab(self):
@@ -435,28 +464,9 @@ class AdaptiveLioLauncher:
         self.reload_config_display()
 
     def reload_config_display(self):
-        """重新加载配置文件显示"""
+        """重新加载配置文件并同步参数面板"""
         try:
             if self.config_path.exists():
-                with open(self.config_path, 'r') as f:
-                    content = f.read()
-
-                # ICP模型
-                m = re.search(r'icpmodel:\s*(\S+)', content)
-                if m:
-                    self.map_info_labels['icp_model'].config(text=m.group(1))
-
-                # 体素大小
-                m = re.search(r'size_voxel_map:\s*([\d.]+)', content)
-                if m:
-                    self.map_info_labels['voxel_size'].config(text=f"{m.group(1)} m")
-
-                # 最大迭代
-                m = re.search(r'max_num_iteration:\s*(\d+)', content)
-                if m:
-                    self.map_info_labels['max_iter'].config(text=m.group(1))
-
-                # 同步更新参数调节页
                 self.reload_params_from_file()
         except Exception as e:
             self.log(f"加载配置失败: {e}", "WARNING")
@@ -511,6 +521,12 @@ class AdaptiveLioLauncher:
 
         try:
             env = os.environ.copy()
+            if self.orin_mode_var.get():
+                if not self.orin_config_path.exists():
+                    messagebox.showerror("错误", f"Orin配置文件不存在:\n{self.orin_config_path}")
+                    return
+                env['ADAPTIVE_LIO_CONFIG'] = str(self.orin_config_path)
+                self.log(f"Orin NX 优化模式: {self.orin_config_path}")
             self.processes['adaptive_lio'] = subprocess.Popen(
                 cmd, shell=True, executable='/bin/bash',
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -705,15 +721,24 @@ class AdaptiveLioLauncher:
 
     def _save_map_async(self, save_path):
         cmd = self.get_source_cmd()
-        cmd += "ros2 service call /save_map std_srvs/srv/Trigger"
+        cmd_trigger = cmd + "ros2 service call /save_map std_srvs/srv/Trigger"
 
         try:
-            result = subprocess.run(cmd, shell=True, executable='/bin/bash',
-                                    capture_output=True, text=True, timeout=120)
-
+            # 1. 触发保存
+            self._save_map_event.clear()
+            result = subprocess.run(cmd_trigger, shell=True, executable='/bin/bash',
+                                    capture_output=True, text=True, timeout=60)
             stdout = result.stdout if result.stdout else ""
-            if "success=true" in stdout.lower() or "success: true" in stdout.lower():
-                # Copy the saved PCD to user-specified path if different from default
+            if "success=true" not in stdout.lower() and "success: true" not in stdout.lower():
+                self.root.after(0, lambda: self._on_save_error(stdout or "保存启动失败"))
+                return
+
+            self.root.after(0, lambda: self.save_status_label.config(
+                text="合并 segments...", foreground='orange'))
+
+            # 2. 等待 stdout 中出现合并完成的日志（由 parse_lio_output 触发 event）
+            if self._save_map_event.wait(timeout=300):
+                # 合并完成
                 default_pcd = str(self.ws_path / "map" / "global_map.pcd")
                 target_pcd = os.path.join(save_path, "global_map.pcd")
                 if os.path.abspath(save_path) != os.path.abspath(str(self.ws_path / "map")):
@@ -722,7 +747,9 @@ class AdaptiveLioLauncher:
                         shutil.copy2(default_pcd, target_pcd)
                 self.root.after(0, lambda p=save_path: self._on_save_success(p))
             else:
-                self.root.after(0, lambda: self._on_save_error(stdout or "未知错误"))
+                self.root.after(0, lambda: self._on_save_error("保存超时(5分钟)，请检查日志"))
+        except subprocess.TimeoutExpired:
+            self.root.after(0, lambda: self._on_save_error("service call 超时，节点可能繁忙，请稍后重试"))
         except Exception as e:
             self.root.after(0, lambda err=str(e): self._on_save_error(err))
 
@@ -868,40 +895,120 @@ class AdaptiveLioLauncher:
             pass
 
     def parse_lio_output(self, text):
-        """解析Adaptive-LIO输出，更新统计面板"""
+        """解析Adaptive-LIO输出，更新资源监控面板"""
         try:
-            # 帧计数 - 匹配 "poseEstimate" 或 frame index
+            # 帧计数
             if "poseEstimate" in text:
                 self.frame_count += 1
-                self.root.after(0, lambda c=self.frame_count:
-                                self.stats_labels['frames'].config(text=str(c)))
 
-            # 解析耗时统计: [Timer] xxx: avg=xx.xxms
-            avg_match = re.search(r'\[Timer\]\s*(\w+).*?avg=([\d.]+)ms', text)
-            if avg_match:
-                name = avg_match.group(1).lower()
-                val = avg_match.group(2)
-                if 'build' in name:
-                    self.root.after(0, lambda v=val: self.stats_labels['build'].config(text=f"{v} ms"))
-                elif 'optim' in name:
-                    self.root.after(0, lambda v=val: self.stats_labels['optimize'].config(text=f"{v} ms"))
-                elif 'pose' in name:
-                    self.root.after(0, lambda v=val: self.stats_labels['pose'].config(text=f"{v} ms"))
+            # 剥除 ANSI 颜色码后解析 [MONITOR] 输出
+            clean = re.sub(r'\x1b\[[0-9;]*m', '', text)
+            monitor_match = re.search(
+                r'\[MONITOR\]\s+frame=(\d+)\s+frame_ms=([\d.]+)\s+RSS=([\d.]+)MB'
+                r'\s+voxel_map=(\d+)\s+mmap_voxels=(\d+)\s+mmap_points=(\d+)',
+                clean)
+            if monitor_match:
+                frame = int(monitor_match.group(1))
+                frame_ms = float(monitor_match.group(2))
+                rss = float(monitor_match.group(3))
+                voxel_map = int(monitor_match.group(4))
+                mmap_voxels = int(monitor_match.group(5))
+                mmap_points = int(monitor_match.group(6))
 
-            # 解析 build frame / optimize / poseEstimate 耗时
-            time_match = re.search(r'(build frame|optimize|poseEstimate).*?:\s*([\d.]+)\s*ms', text)
-            if time_match:
-                name = time_match.group(1).strip().lower()
-                val = time_match.group(2)
-                if 'build' in name:
-                    self.root.after(0, lambda v=val: self.stats_labels['build'].config(text=f"{v} ms"))
-                elif 'optim' in name:
-                    self.root.after(0, lambda v=val: self.stats_labels['optimize'].config(text=f"{v} ms"))
-                elif 'pose' in name:
-                    self.root.after(0, lambda v=val: self.stats_labels['pose'].config(text=f"{v} ms"))
+                self.monitor_data['frame'].append(frame)
+                self.monitor_data['frame_ms'].append(frame_ms)
+                self.monitor_data['rss'].append(rss)
+                self.monitor_data['voxel_map'].append(voxel_map)
+                self.monitor_data['mmap_voxels'].append(mmap_voxels)
+                self.monitor_data['mmap_points'].append(mmap_points)
+                self.graph_needs_update = True
+
+                self.root.after(0, lambda fm=frame_ms, r=rss, v=voxel_map,
+                                mv=mmap_voxels, mp=mmap_points:
+                                self._update_monitor_values(fm, r, v, mv, mp))
+
+            # 检测地图合并完成
+            if "[Memory Management] SUCCESS: Merged" in clean:
+                self._save_map_event.set()
 
         except Exception:
             pass
+
+    # ==================== 资源监控方法 ====================
+
+    def update_resource_graph(self):
+        """定期刷新资源监控图表"""
+        if self.graph_needs_update and len(self.monitor_data['frame']) > 0:
+            self.graph_needs_update = False
+
+            frames = list(self.monitor_data['frame'])
+            frame_ms = list(self.monitor_data['frame_ms'])
+            rss = list(self.monitor_data['rss'])
+
+            # 帧耗时曲线
+            self.ax_framems.clear()
+            self.ax_framems.plot(frames, frame_ms, color='#1565C0', linewidth=1.2)
+            self.ax_framems.fill_between(frames, frame_ms, alpha=0.08, color='#1565C0')
+            self.ax_framems.axhline(y=100, color='#FF9800', linewidth=0.8,
+                                    linestyle='--', alpha=0.6)
+            self.ax_framems.axhline(y=200, color='#D32F2F', linewidth=0.8,
+                                    linestyle='--', alpha=0.6)
+            self.ax_framems.set_ylabel('Frame Time (ms)', fontsize=8)
+            self.ax_framems.set_title('Real-time Resource Monitor', fontsize=9,
+                                      fontweight='bold')
+            self.ax_framems.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            self.ax_framems.tick_params(labelsize=7)
+
+            # RSS 内存曲线
+            self.ax_rss.clear()
+            self.ax_rss.plot(frames, rss, color='#2E7D32', linewidth=1.2)
+            self.ax_rss.fill_between(frames, rss, alpha=0.08, color='#2E7D32')
+            self.ax_rss.axhline(y=6000, color='#FF9800', linewidth=0.8,
+                                linestyle='--', alpha=0.6)
+            self.ax_rss.axhline(y=10000, color='#D32F2F', linewidth=0.8,
+                                linestyle='--', alpha=0.6)
+            self.ax_rss.set_ylabel('RSS Memory (MB)', fontsize=8)
+            self.ax_rss.set_xlabel('Frame Index', fontsize=8)
+            self.ax_rss.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            self.ax_rss.tick_params(labelsize=7)
+
+            self.fig.tight_layout(pad=1.5)
+            self.canvas_fig.draw_idle()
+
+        self.root.after(1000, self.update_resource_graph)
+
+    def _update_monitor_values(self, frame_ms, rss, voxel_map, mmap_voxels, mmap_points):
+        """更新资源监控数值与紧张度指示"""
+        self.monitor_labels['frame_ms'].config(text=f"{frame_ms:.1f} ms")
+        self.monitor_labels['rss'].config(text=f"{rss:.0f} MB")
+        self.monitor_labels['voxel_map'].config(text=f"{voxel_map:,}")
+        self.monitor_labels['mmap_info'].config(text=f"V:{mmap_voxels:,} P:{mmap_points:,}")
+
+        # 计算紧张度
+        level = "正常"
+        color = '#2E7D32'
+        reasons = []
+
+        if frame_ms > 200:
+            reasons.append(f"帧耗时过高({frame_ms:.0f}ms)")
+        elif frame_ms > 100:
+            reasons.append(f"帧耗时偏高({frame_ms:.0f}ms)")
+
+        if rss > 10000:
+            reasons.append(f"内存紧张({rss:.0f}MB)")
+        elif rss > 6000:
+            reasons.append(f"内存偏高({rss:.0f}MB)")
+
+        if rss > 10000 or frame_ms > 200:
+            level = "紧张"
+            color = '#D32F2F'
+        elif rss > 6000 or frame_ms > 100:
+            level = "警告"
+            color = '#FF9800'
+
+        detail = ", ".join(reasons) if reasons else "资源充裕"
+        self.tightness_label.config(text=level, foreground=color)
+        self.tightness_detail.config(text=detail, foreground=color)
 
     def on_closing(self):
         if messagebox.askokcancel("退出", "确定退出？将停止所有运行中的节点。"):

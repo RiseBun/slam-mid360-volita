@@ -1,2 +1,1 @@
-source;share/adaptive_lio/environment/ament_prefix_path.sh
-source;share/adaptive_lio/environment/path.sh
+/home/pace2204/slam-mid360-volita/build/adaptive_lio/ament_cmake_environment_hooks/local_setup.dsv

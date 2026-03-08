@@ -1,4 +1,5 @@
-YAML: 1.0
+%YAML 1.2
+# Adaptive-LIO 配置文件
 
 preprocess:
   point_filter_num: 1
@@ -75,3 +76,5 @@ odometry:
 
   satu_acc: 19.5 # the saturation value of IMU's acceleration. not related to the units
   satu_gyro: 16 # the saturation value of IMU's angular velocity. not related to the units
+
+  enable_mmap: false  # Multi-resolution map (unused by current ICP path, disable to save memory)

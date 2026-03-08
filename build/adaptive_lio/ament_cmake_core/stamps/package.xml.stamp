@@ -19,6 +19,7 @@
   <depend>pcl_conversions</depend>
   <depend>livox_ros_driver2</depend>
   <depend>std_srvs</depend>
+  <depend>ament_index_cpp</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
