@@ -1,2 +1,0 @@
-/usr/bin/ar qc libadaptive_lio.pre.a CMakeFiles/adaptive_lio.pre.dir/src/preprocess/cloud_convert/cloud_convert2.cc.o
-/usr/bin/ranlib libadaptive_lio.pre.a

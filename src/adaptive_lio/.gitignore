@@ -10,8 +10,14 @@ log/
 *.swo
 *~
 
-# Map outputs (user generated)
+# Map outputs (runtime generated)
 map/*.pcd
+map/*.cam
+map/.*.cam
+map/trajectory.txt
+
+# Config copies (user backups)
+config/mapping_m copy.yaml
 
 # Log files
 log/*.txt
