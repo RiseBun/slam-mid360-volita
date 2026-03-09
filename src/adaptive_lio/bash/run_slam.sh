@@ -8,7 +8,9 @@
 # 选项:
 #   --rviz          启动 RViz2 可视化 (默认)
 #   --no-rviz       不启动 RViz2
-#   --orin          使用 Orin NX 优化配置 (低功耗/边缘设备)
+#   --orin          使用 Orin NX 优化配置 (16GB)
+#   --orin-nano     使用 Orin Nano 极限优化配置 (8GB/低内存设备)
+#   --driver        启动 Livox MID360 驱动 (实时模式需要)
 #   --config FILE   使用指定的配置文件
 #   --map-path PATH 指定地图保存路径 (默认: 源码目录/map/)
 #   --bag PATH      播放指定的 rosbag 文件
@@ -18,6 +20,8 @@
 # 示例:
 #   ./run_slam.sh --rviz --map-path /tmp/my_map/
 #   ./run_slam.sh --orin --no-rviz --bag /path/to/data.db3 --rate 2.0
+#   ./run_slam.sh --orin --driver --no-rviz --map-path ~/map  # 实时建图
+#   ./run_slam.sh --orin-nano --driver --no-rviz              # Nano 实时建图
 #
 
 set -e
@@ -33,11 +37,14 @@ MAP_PATH=""
 BAG_PATH=""
 BAG_RATE="1.0"
 USE_ORIN=false
+USE_ORIN_NANO=false
+USE_DRIVER=false
 CUSTOM_CONFIG=""
 
 # 配置文件路径
 CONFIG_FILE="$PKG_DIR/config/mapping_m.yaml"
 CONFIG_ORIN="$PKG_DIR/config/mapping_orin_nx.yaml"
+CONFIG_ORIN_NANO="$PKG_DIR/config/mapping_orin_nano.yaml"
 CONFIG_BACKUP=""
 
 # 颜色输出
@@ -67,7 +74,9 @@ show_help() {
     echo "选项:"
     echo "  --rviz              启动 RViz2 可视化 (默认)"
     echo "  --no-rviz           不启动 RViz2"
-    echo "  --orin              使用 Orin NX 优化配置 (边缘设备/低功耗)"
+    echo "  --orin              使用 Orin NX 优化配置 (16GB)"
+    echo "  --orin-nano         使用 Orin Nano 极限优化配置 (8GB/低内存)"
+    echo "  --driver            启动 Livox MID360 驱动 (实时模式需要)"
     echo "  --config FILE       使用指定的配置文件"
     echo "  --map-path PATH     指定地图保存路径"
     echo "  --bag PATH          播放指定的 rosbag 文件"
@@ -77,6 +86,8 @@ show_help() {
     echo "示例:"
     echo "  $0 --rviz"
     echo "  $0 --orin --no-rviz --bag /path/to/rosbag --rate 1.5"
+    echo "  $0 --orin --driver --no-rviz --map-path ~/map  # 实时建图"
+    echo "  $0 --orin-nano --driver --no-rviz              # Nano 实时建图"
     echo "  $0 --config /path/to/custom.yaml --map-path /tmp/slam_output/"
 }
 
@@ -93,6 +104,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --orin)
             USE_ORIN=true
+            shift
+            ;;
+        --orin-nano)
+            USE_ORIN_NANO=true
+            shift
+            ;;
+        --driver)
+            USE_DRIVER=true
             shift
             ;;
         --config)
@@ -131,6 +150,13 @@ if [[ -n "$CUSTOM_CONFIG" ]]; then
     fi
     CONFIG_FILE="$CUSTOM_CONFIG"
     log_info "使用自定义配置: $CONFIG_FILE"
+elif [[ "$USE_ORIN_NANO" == true ]]; then
+    if [[ ! -f "$CONFIG_ORIN_NANO" ]]; then
+        log_error "Orin Nano 配置文件不存在: $CONFIG_ORIN_NANO"
+        exit 1
+    fi
+    CONFIG_FILE="$CONFIG_ORIN_NANO"
+    log_info "使用 Orin Nano 极限优化配置: $CONFIG_FILE"
 elif [[ "$USE_ORIN" == true ]]; then
     if [[ ! -f "$CONFIG_ORIN" ]]; then
         log_error "Orin 配置文件不存在: $CONFIG_ORIN"
@@ -152,6 +178,9 @@ cleanup() {
     fi
     
     # 杀掉子进程
+    if [[ -n "$DRIVER_PID" ]] && kill -0 $DRIVER_PID 2>/dev/null; then
+        kill $DRIVER_PID 2>/dev/null || true
+    fi
     if [[ -n "$RVIZ_PID" ]] && kill -0 $RVIZ_PID 2>/dev/null; then
         kill $RVIZ_PID 2>/dev/null || true
     fi
@@ -160,9 +189,9 @@ cleanup() {
     fi
     if [[ -n "$NODE_PID" ]] && kill -0 $NODE_PID 2>/dev/null; then
         kill -INT $NODE_PID 2>/dev/null || true
-        # 等待节点优雅退出（执行地图合并），最多等待30秒
-        log_info "等待节点完成地图保存 (最多30秒)..."
-        for i in $(seq 1 30); do
+        # 等待节点优雅退出（执行地图合并），最多等待120秒
+        log_info "等待节点完成地图保存 (最多120秒)..."
+        for i in $(seq 1 120); do
             if ! kill -0 $NODE_PID 2>/dev/null; then
                 break
             fi
@@ -206,6 +235,34 @@ check_environment() {
     fi
     
     log_info "环境检查通过"
+}
+
+# 启动 Livox MID360 驱动
+start_driver() {
+    if [[ "$USE_DRIVER" == true ]]; then
+        # 查找 livox_ws
+        LIVOX_WS="${LIVOX_WS_PATH:-$HOME/livox_ws}"
+        if [[ ! -f "$LIVOX_WS/install/setup.bash" ]]; then
+            log_error "未找到 livox_ros_driver2 工作空间: $LIVOX_WS"
+            log_error "请设置 LIVOX_WS_PATH 环境变量或确保 ~/livox_ws 存在"
+            exit 1
+        fi
+        source "$LIVOX_WS/install/setup.bash"
+
+        log_info "启动 Livox MID360 驱动..."
+        ros2 launch livox_ros_driver2 msg_MID360_launch.py &
+        DRIVER_PID=$!
+        sleep 3  # 等待驱动初始化并建立网络连接
+
+        if ! kill -0 $DRIVER_PID 2>/dev/null; then
+            log_error "Livox 驱动启动失败"
+            exit 1
+        fi
+        log_info "Livox 驱动已启动 (PID: $DRIVER_PID)"
+    elif [[ -z "$BAG_PATH" ]]; then
+        log_warn "未指定 --bag 且未启用 --driver，节点将等待外部数据源"
+        log_warn "如需实时建图，请添加 --driver 选项"
+    fi
 }
 
 # 修改配置文件中的地图保存路径
@@ -289,6 +346,8 @@ show_status() {
     echo ""
     echo -e "  配置文件:   $(basename $CONFIG_FILE)"
     [[ "$USE_ORIN" == true ]] && echo -e "  模式:       ${YELLOW}Orin NX 优化模式${NC}"
+    [[ "$USE_ORIN_NANO" == true ]] && echo -e "  模式:       ${YELLOW}Orin Nano 极限优化模式${NC}"
+    echo -e "  Livox驱动:  $([ "$USE_DRIVER" == true ] && echo "启用" || echo "禁用")"
     echo -e "  RViz2:      $([ "$USE_RVIZ" == true ] && echo "启用" || echo "禁用")"
     echo -e "  地图路径:   ${MAP_PATH:-"默认 (源码目录/map/)"}"
     echo -e "  rosbag:     ${BAG_PATH:-"未指定 (等待实时数据)"}"
@@ -303,6 +362,7 @@ show_status() {
 main() {
     check_environment
     modify_config
+    start_driver
     start_slam_node
     start_rviz
     play_bag

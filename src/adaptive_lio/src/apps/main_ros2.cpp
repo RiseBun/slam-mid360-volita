@@ -183,24 +183,6 @@ public:
         last_merged_segment_index_ = -1;  // No manual merge done yet
         max_map_points_ = 2000000;  // Hard limit: 2 million points (~64MB)
 
-        // Open trajectory file for TUM format output
-        {
-            std::string traj_dir = map_save_path_;
-            std::string mkdir_cmd = "mkdir -p " + traj_dir;
-            system(mkdir_cmd.c_str());
-            std::string traj_path = traj_dir + "trajectory.txt";
-            traj_fout_.open(traj_path, std::ios::out);
-            if (traj_fout_.is_open())
-            {
-                traj_fout_ << "# TUM format: timestamp tx ty tz qx qy qz qw" << std::endl;
-                RCLCPP_INFO(this->get_logger(), "Trajectory file: %s", traj_path.c_str());
-            }
-            else
-            {
-                RCLCPP_WARN(this->get_logger(), "Failed to open trajectory file: %s", traj_path.c_str());
-            }
-        }
-
         // config file - support environment variable override
         std::string config_file;
         const char* env_config = std::getenv("ADAPTIVE_LIO_CONFIG");
@@ -281,6 +263,23 @@ public:
             if (map_voxel_size_ > 1.0f) map_voxel_size_ = 1.0f;    // maximum 1m
         }
         RCLCPP_INFO(this->get_logger(), "Map voxel size: %.3f m (smaller = denser points)", map_voxel_size_);
+
+        // Open trajectory file AFTER map_save_path_ is finalized
+        {
+            std::string mkdir_cmd = "mkdir -p " + map_save_path_;
+            system(mkdir_cmd.c_str());
+            std::string traj_path = map_save_path_ + "trajectory.txt";
+            traj_fout_.open(traj_path, std::ios::out);
+            if (traj_fout_.is_open())
+            {
+                traj_fout_ << "# TUM format: timestamp tx ty tz qx qy qz qw" << std::endl;
+                RCLCPP_INFO(this->get_logger(), "Trajectory file: %s", traj_path.c_str());
+            }
+            else
+            {
+                RCLCPP_WARN(this->get_logger(), "Failed to open trajectory file: %s", traj_path.c_str());
+            }
+        }
 
         // Subscribers
         sub_imu_ = this->create_subscription<sensor_msgs::msg::Imu>(
@@ -374,8 +373,11 @@ public:
             RCLCPP_INFO(this->get_logger(), "[Memory Management] No data was processed, skipping merge");
         }
 
+        // Signal processing thread to stop and discard queued data
+        if (lio_)
+            lio_->requestStop();
         if (process_thread_.joinable())
-            process_thread_.detach();
+            process_thread_.join();
 
         zjloc::common::Timer::PrintAll();
         {
@@ -469,8 +471,13 @@ public:
                                       std::chrono::steady_clock::now() - start)
                                       .count();
                 RCLCPP_INFO(this->get_logger(),
-                            "[Memory Management] SUCCESS: Merged %d segments -> %s (%zu points, %.1fs)",
-                            loaded_count, final_path.c_str(), filtered->size(), elapsed_ms / 1000.0);
+                            "\n\n"
+                            "============================================================\n"
+                            "  MAP MERGE COMPLETE\n"
+                            "  Output: %s\n"
+                            "  Points: %zu  |  Segments: %d  |  Time: %.1fs\n"
+                            "============================================================\n",
+                            final_path.c_str(), filtered->size(), loaded_count, elapsed_ms / 1000.0);
             }
             else
             {

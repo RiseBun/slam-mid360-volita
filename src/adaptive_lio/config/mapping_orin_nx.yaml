@@ -24,7 +24,6 @@ mapping:
 map_options:
   map_type: MULTI_RESOLUTION_VOXEL_HASHMAP
   resolutions:
-    # 降低分辨率，减少 voxel 数量和内存占用
     - resolution: 0.3      # 0.2 → 0.3
       max_num_points: 15   # 20 → 15
       min_distance_between_points: 0.08

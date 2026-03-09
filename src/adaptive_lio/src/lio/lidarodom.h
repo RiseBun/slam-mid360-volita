@@ -11,6 +11,7 @@
 #include "common/map.hpp"
 
 #include <condition_variable>
+#include <atomic>
 
 #include "tools/tool_color_printf.hpp"
 #include "common/timer/timer.h"
@@ -87,6 +88,9 @@ namespace zjloc
           void pushData(IMUPtr imu);
 
           void run();
+
+          /// Signal the processing loop to stop (drain remaining queue and exit)
+          void requestStop() { stop_requested_.store(true); cond.notify_all(); }
 
           int getIndex() { return index_frame; }
 
@@ -205,6 +209,7 @@ namespace zjloc
           std::mutex mtx_buf;
           std::mutex mtx_state;
           std::condition_variable cond;
+          std::atomic<bool> stop_requested_{false};
 
           state *current_state;
           state *prev_state_ = nullptr;   // 倒数第2帧 state（环形缓冲，替代 all_state_frame）

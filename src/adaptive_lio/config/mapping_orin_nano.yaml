@@ -1,0 +1,84 @@
+%YAML 1.2
+# Orin Nano 8GB / 低内存边缘设备 极限优化配置
+# 目标: 控制 RSS < 4GB，帧处理 < 200ms，避免 swap 导致的性能退化
+# 相比 Orin NX 配置进一步降低计算量和内存占用，牺牲部分地图密度换取实时性
+
+preprocess:
+  point_filter_num: 3  # 每3个点取1个 (NX:2)，减少33%输入点数
+  lidar_type: 1 # 1-AVIA 2-velodyne 3-ouster 4-robosense 5-pandar
+  blind: 0.1
+  sweep_cut_num: 1
+  degenerate_window_num: 10
+
+common:
+  imu_topic: /livox/imu
+  lid_topic: /livox/lidar
+  gnorm: 1
+  map_save_path: ""
+  map_voxel_size: 0.15  # NX:0.1 → 0.15，降低输出地图密度
+
+mapping:
+  extrinsic_est_en: true
+  extrinsic_T: [0, 0, 0]
+  extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+map_options:
+  map_type: MULTI_RESOLUTION_VOXEL_HASHMAP
+  resolutions:
+    - resolution: 0.3
+      max_num_points: 15
+      min_distance_between_points: 0.08
+    - resolution: 0.8
+      max_num_points: 15
+      min_distance_between_points: 0.2
+    - resolution: 1.5
+      max_num_points: 30
+      min_distance_between_points: 0.3
+  neig_options:
+    distance_max: 60
+    radius_min: 0.3
+    radius_max: 1.5
+    exponent: 1.0
+
+delay_time: 0.2
+
+odometry:
+  surf_res: 0.8            # NX:0.6 → 0.8，更大的采样体素 = 更少的 keypoints
+  log_print: false
+  max_num_iteration: 4     # NX:6 → 4，减少 ICP 外层迭代
+  ceres_iterations: 3      # Ceres 内层迭代保持 3
+  ceres_threads: 4         # 4线程并行
+  # ct_icp
+  icpmodel: CT_POINT_TO_PLANE
+  size_voxel_map: 0.8      # NX:0.6 → 0.8，更大 voxel = 更少 voxel 数量 = 更少内存
+  min_distance_points: 0.25 # NX:0.2 → 0.25，voxel 内点间更稀疏
+  max_num_points_in_voxel: 10  # NX:15 → 10，每个 voxel 存更少的点
+  max_distance: 40.0       # NX:60 → 40，更激进的 FOV 清理 (核心: 减少活跃 voxel 数)
+  weight_alpha: 0.9
+  weight_neighborhood: 0.1
+  max_dist_to_plane_icp: 0.3
+  init_num_frames: 20
+  voxel_neighborhood: 1
+  max_number_neighbors: 10  # NX:15 → 10，每次搜索返回更少邻居
+  threshold_voxel_occupancy: 1
+  estimate_normal_from_neighborhood: true
+  min_number_neighbors: 10  # NX:15 → 10，降低邻居要求
+  power_planarity: 2.0
+  num_closest_neighbors: 1
+
+  sampling_rate: 1.0
+  max_num_residuals: 500   # NX:800 → 500，减少 Ceres 残差块
+  min_num_residuals: 20    # NX:30 → 20
+  motion_compensation: CONSTANT_VELOCITY
+  beta_location_consistency: 0.001
+  beta_orientation_consistency: 0.1
+  beta_constant_velocity: 0.001
+  beta_small_velocity: 0.01
+
+  thres_translation_norm: 0.01
+  thres_orientation_norm: 0.1
+
+  satu_acc: 19.5
+  satu_gyro: 16
+
+  enable_mmap: false  # Multi-resolution map disabled (saves 50-200MB on edge devices)

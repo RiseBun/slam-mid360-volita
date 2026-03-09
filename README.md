@@ -14,8 +14,8 @@
 - **CT-ICP 连续时间运动补偿**：扫描内每个点独立去畸变，高动态场景下精度更高
 - **Ceres 多约束优化**：7 种约束因子联合优化，天然抗退化
 - **多分辨率体素地图**：3 层分辨率 (0.2m/0.5m/1.2m)，平衡精度与效率
-- **内存管理**：分段保存机制，支持长时间大范围建图
-- **边缘设备优化**：内置 Orin NX 专用配置，支持资源受限平台
+- **内存管理**：分段保存 + voxel map 大小限制，支持长时间大范围建图
+- **边缘设备优化**：内置 Orin NX / Orin Nano 专用配置，支持资源受限平台
 - **GUI 控制面板**：可视化参数调节、一键启停、实时状态监控
 
 ---
@@ -53,7 +53,7 @@
 | x86_64 (i5/i7/i9) | `mapping_m.yaml` | 默认配置，全功能 |
 | Jetson AGX Orin | `mapping_m.yaml` | 可使用默认配置 |
 | **Jetson Orin NX 16GB** | `mapping_orin_nx.yaml` | 专用优化配置 |
-| Jetson Orin NX 8GB | 需进一步优化 | 内存受限 |
+| **Jetson Orin Nano 8GB** | `mapping_orin_nano.yaml` | 极限优化配置 |
 
 ---
 
@@ -156,6 +156,12 @@ cd ~/slam-mid360-volita/src/adaptive_lio/bash
 # Orin NX 优化模式
 ./run_slam.sh --orin --no-rviz --bag /path/to/rosbag
 
+# Orin Nano 极限优化模式
+./run_slam.sh --orin-nano --no-rviz --bag /path/to/rosbag
+
+# 实时建图（自动启动 Livox 驱动）
+./run_slam.sh --orin --driver --no-rviz --map-path ~/map
+
 # 使用自定义配置
 ./run_slam.sh --config /path/to/custom.yaml
 ```
@@ -166,7 +172,9 @@ cd ~/slam-mid360-volita/src/adaptive_lio/bash
 |------|------|
 | `--rviz` | 启动 RViz2 可视化（默认） |
 | `--no-rviz` | 不启动 RViz2 |
-| `--orin` | 使用 Orin NX 优化配置 |
+| `--orin` | 使用 Orin NX 优化配置（16GB） |
+| `--orin-nano` | 使用 Orin Nano 极限优化配置（8GB/低内存设备） |
+| `--driver` | 启动 Livox MID360 驱动（实时建图时需要） |
 | `--config FILE` | 使用指定配置文件 |
 | `--map-path PATH` | 指定地图保存路径 |
 | `--bag PATH` | 播放指定 rosbag |
@@ -194,17 +202,21 @@ python3 ~/slam-mid360-volita/src/adaptive_lio/scripts/gui_launcher.py
 
 ### Jetson Orin NX 16GB 配置
 
-系统内置了针对 Orin NX 16GB 优化的配置文件：
-
 ```bash
-# 使用 Orin 优化模式启动
+# 使用 Orin NX 优化模式启动
 ./run_slam.sh --orin --no-rviz
+
+# 实时建图（自动启动 Livox 驱动）
+./run_slam.sh --orin --driver --no-rviz --map-path ~/map
+
+# 播放 rosbag
+./run_slam.sh --orin --no-rviz --bag /path/to/rosbag --rate 1.0
 ```
 
 #### Orin NX 配置优化项
 
-| 参数 | 默认值 | Orin值 | 说明 |
-|------|--------|--------|------|
+| 参数 | 默认值 | Orin NX 值 | 说明 |
+|------|--------|-----------|------|
 | point_filter_num | 1 | 2 | 每2点取1，减少输入 |
 | map_voxel_size | 0.05 | 0.1 | 降低地图密度 |
 | max_num_iteration | 10 | 6 | 减少ICP迭代 |
@@ -212,15 +224,44 @@ python3 ~/slam-mid360-volita/src/adaptive_lio/scripts/gui_launcher.py
 | ceres_threads | 3 | 4 | 利用8核CPU |
 | max_num_residuals | 1200 | 800 | 减少残差数量 |
 | max_distance | 80 | 60 | 更激进FOV清理 |
-| resolutions | 0.2/0.5/1.2 | 0.3/0.8/1.5 | 降低分辨率 |
 
-#### 预期性能（Orin NX 16GB）
+### Jetson Orin Nano 8GB / 低内存设备配置
 
-| 指标 | 默认配置 | Orin优化配置 |
-|------|---------|-------------|
-| 帧处理时间 | 300-500ms | 150-250ms |
-| 内存占用 | ~3GB | ~1.5-2GB |
-| 实时性 | 不足 | 接近实时 |
+针对 8GB 共享内存设备进一步压缩计算量和内存占用，避免 swap 导致的性能退化：
+
+```bash
+# 使用 Orin Nano 极限优化模式启动
+./run_slam.sh --orin-nano --no-rviz
+
+# 实时建图
+./run_slam.sh --orin-nano --driver --no-rviz --map-path ~/map
+
+# 播放 rosbag
+./run_slam.sh --orin-nano --no-rviz --bag /path/to/rosbag --rate 1.0
+```
+
+#### Orin Nano 配置优化项（相比 Orin NX 进一步压缩）
+
+| 参数 | Orin NX | Orin Nano | 说明 |
+|------|---------|-----------|------|
+| point_filter_num | 2 | **3** | 每3点取1，输入再减33% |
+| map_voxel_size | 0.1 | **0.15** | 更稀疏的输出地图 |
+| max_num_iteration | 6 | **4** | ICP迭代再减33% |
+| surf_res | 0.6 | **0.8** | 更少keypoints |
+| size_voxel_map | 0.6 | **0.8** | 更大voxel，更少内存 |
+| max_num_points_in_voxel | 15 | **10** | 每voxel存更少的点 |
+| max_num_residuals | 800 | **500** | Ceres残差再减37% |
+| max_number_neighbors | 15 | **10** | 邻域搜索量减33% |
+| max_distance | 60 | **40** | 更激进FOV清理 |
+
+#### 三档配置对比
+
+| 指标 | 默认 (x86) | Orin NX (16GB) | Orin Nano (8GB) |
+|------|-----------|----------------|-----------------|
+| 目标帧率 | 10Hz 实时 | 接近实时 | 接近实时 |
+| 内存占用 | ~3GB | ~2GB | <4GB（避免swap） |
+| 地图精度 | 最高 | 高 | 中等 |
+| 适用场景 | 桌面/服务器 | Orin NX 16GB | Orin Nano 8GB / 低内存 |
 
 #### 部署建议
 
@@ -233,11 +274,16 @@ python3 ~/slam-mid360-volita/src/adaptive_lio/scripts/gui_launcher.py
    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
    ```
 
-2. **测试时降低速率**：先用 `--rate 0.5` 测试稳定性
+2. **低内存设备编译**：内存不足时限制编译线程
+   ```bash
+   MAKEFLAGS="-j1" colcon build --symlink-install
+   ```
 
-3. **关闭 RViz**：边缘设备上使用 `--no-rviz` 节省资源
+3. **测试时降低速率**：先用 `--rate 0.5` 测试稳定性
 
-4. **监控资源**：运行时观察 MONITOR 日志中的 RSS 和 frame_ms
+4. **关闭 RViz**：边缘设备上使用 `--no-rviz` 节省资源
+
+5. **监控资源**：运行时观察 MONITOR 日志中的 RSS 和 frame_ms
 
 ---
 
@@ -302,7 +348,7 @@ common:
 | **楼梯/退化场景** | `beta_orientation_consistency: 0.5`<br>`motion_compensation: CONTINUOUS` |
 | **快速运动** | `max_dist_to_plane_icp: 0.2`<br>`max_num_iteration: 15` |
 | **大范围建图** | `max_distance: 100`<br>`map_voxel_size: 0.1` |
-| **边缘设备** | 使用 `--orin` 或 `mapping_orin_nx.yaml` |
+| **边缘设备** | 使用 `--orin` / `--orin-nano` 或对应配置文件 |
 
 ---
 
@@ -330,17 +376,20 @@ pcl_viewer map/global_map.pcd
 ros2 run pcl_ros pcd_to_pointcloud map/global_map.pcd 0.1 --ros-args -r cloud_pcd:=/map
 ```
 
-### 内存管理机制
+### 输出文件
 
-系统采用分段保存机制，每移动 50 米或点数超过 200 万时自动保存：
+节点退出（Ctrl+C）时自动保存并合并地图，输出到 `--map-path` 指定的路径（默认 `源码目录/map/`）：
 
 ```
 map/
-├── segment_0.pcd      # 第一段
-├── segment_1.pcd      # 第二段
+├── segment_0.pcd      # 分段点云
+├── segment_1.pcd
 ├── ...
-└── global_map.pcd     # 最终合并地图
+├── global_map.pcd     # 最终合并地图
+└── trajectory.txt     # TUM 格式轨迹文件 (timestamp tx ty tz qx qy qz qw)
 ```
+
+> 轨迹文件随 `--map-path` 保存到同一目录，可直接用于 evo 等工具评估精度。
 
 ---
 
@@ -361,7 +410,7 @@ map/
 
 ### 异常诊断
 
-- **frame_ms 持续 >150ms**：考虑使用 Orin 优化配置
+- **frame_ms 持续 >150ms**：考虑使用 `--orin` 或 `--orin-nano` 优化配置
 - **RSS 线性增长**：检查 max_distance 是否过大
 - **mmap_points 只增不减**：FOV 清理可能失效
 
@@ -413,9 +462,10 @@ common:
 
 ### Q: 长时间运行内存不足
 
-1. 使用 `--orin` 优化模式
+1. 使用 `--orin` 或 `--orin-nano` 优化模式
 2. 增大 `map_voxel_size`
 3. 减小 `max_distance`
+4. 配置 swap（至少 8GB）
 
 ### Q: MID-360 连接不上
 
@@ -431,9 +481,10 @@ common:
 slam-mid360-volita/
 ├── src/adaptive_lio/
 │   ├── config/
-│   │   ├── mapping_m.yaml        # 默认配置
-│   │   ├── mapping_orin_nx.yaml  # Orin NX 优化配置
-│   │   └── adaptive_lio.rviz     # RViz 配置
+│   │   ├── mapping_m.yaml           # 默认配置 (x86/高性能设备)
+│   │   ├── mapping_orin_nx.yaml     # Orin NX 16GB 优化配置
+│   │   ├── mapping_orin_nano.yaml   # Orin Nano 8GB 极限优化配置
+│   │   └── adaptive_lio.rviz        # RViz 配置
 │   ├── bash/
 │   │   └── run_slam.sh           # 启动脚本
 │   ├── launch/

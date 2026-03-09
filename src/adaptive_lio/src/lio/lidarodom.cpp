@@ -267,8 +267,21 @@ namespace zjloc
                std::vector<MeasureGroup> measurements;
                std::unique_lock<std::mutex> lk(mtx_buf);
                cond.wait(lk, [&]
-                         { return (measurements = getMeasureMents()).size() != 0; });
+                         { return (measurements = getMeasureMents()).size() != 0 || stop_requested_.load(); });
                lk.unlock();
+
+               // If stop requested, discard remaining queued data and exit
+               if (stop_requested_.load())
+               {
+                    std::lock_guard<std::mutex> guard(mtx_buf);
+                    size_t remaining = lidar_buffer_.size();
+                    lidar_buffer_.clear();
+                    imu_buffer_.clear();
+                    time_buffer_.clear();
+                    if (remaining > 0)
+                         printf("\n[SHUTDOWN] Discarded %zu queued frames for fast exit.\n", remaining);
+                    return;
+               }
 
                for (auto &m : measurements)
                {
@@ -1130,35 +1143,40 @@ namespace zjloc
 
      void lidarodom_m::map_incremental(cloudFrame *p_frame, int min_num_points)
      {
+          // Pre-compute transforms outside the loop (avoid re-creating per point)
+          const Eigen::Quaterniond end_quat = p_frame->p_state->rotation;
+          const Eigen::Quaterniond begin_quat = p_frame->p_state->rotation_begin;
+          const Eigen::Vector3d end_t = p_frame->p_state->translation;
+          const Eigen::Vector3d begin_t = p_frame->p_state->translation_begin;
+          const bool use_ct = options_.point_to_plane_with_distortion ||
+                              options_.icpmodel == IcpModel::CT_POINT_TO_PLANE;
+
+          // Pre-compute end-only transform for non-CT mode
+          Eigen::Matrix3d R_end;
+          if (!use_ct)
+               R_end = end_quat.normalized().toRotationMatrix();
+
           //   only surf
           for (auto &point : p_frame->point_surf)
           {
+               Eigen::Matrix3d R;
+               Eigen::Vector3d t;
+
+               if (use_ct)
                {
-                    Eigen::Matrix3d R;
-                    Eigen::Vector3d t;
-
-                    Eigen::Quaterniond end_quat = p_frame->p_state->rotation;
-                    Eigen::Quaterniond begin_quat = p_frame->p_state->rotation_begin;
-                    Eigen::Vector3d end_t = p_frame->p_state->translation;
-                    Eigen::Vector3d begin_t = p_frame->p_state->translation_begin;
-
-                    if (options_.point_to_plane_with_distortion ||
-                        options_.icpmodel == IcpModel::CT_POINT_TO_PLANE)
-                    {
-                         double alpha_time = point.alpha_time;
-
-                         Eigen::Quaterniond q = begin_quat.slerp(alpha_time, end_quat);
-                         q.normalize();
-                         R = q.toRotationMatrix();
-                         t = (1.0 - alpha_time) * begin_t + alpha_time * end_t;
-                    }
-                    else
-                    {
-                         R = end_quat.normalized().toRotationMatrix();
-                         t = end_t;
-                    }
-                    point.point = R * (TIL_ * point.raw_point) + t;
+                    double alpha_time = point.alpha_time;
+                    Eigen::Quaterniond q = begin_quat.slerp(alpha_time, end_quat);
+                    q.normalize();
+                    R = q.toRotationMatrix();
+                    t = (1.0 - alpha_time) * begin_t + alpha_time * end_t;
                }
+               else
+               {
+                    R = R_end;
+                    t = end_t;
+               }
+               point.point = R * (TIL_ * point.raw_point) + t;
+
                addPointToMap(voxel_map, point.point, point.intensity,
                              options_.size_voxel_map, options_.max_num_points_in_voxel,
                              options_.min_distance_points, min_num_points, p_frame);
@@ -1178,6 +1196,17 @@ namespace zjloc
      {
           Eigen::Vector3d location = current_state->translation;
           double sq_max_distance = options_.max_distance * options_.max_distance;
+
+          // Hard cap: if voxel_map exceeds 80K voxels, shrink the effective radius
+          // to force cleanup and prevent memory from growing unboundedly.
+          // Each voxel with 10-15 points costs ~300-500 bytes, so 80K voxels ≈ 30-40MB.
+          const size_t max_voxel_count = 80000;
+          if (voxel_map.size() > max_voxel_count)
+          {
+               // Use 60% of max_distance to aggressively prune
+               double shrink_dist = options_.max_distance * 0.6;
+               sq_max_distance = shrink_dist * shrink_dist;
+          }
 
           std::vector<voxel> voxels_to_erase;
           for (auto &pair : voxel_map)
