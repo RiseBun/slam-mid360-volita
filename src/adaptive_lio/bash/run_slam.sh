@@ -11,6 +11,7 @@
 #   --orin          使用 Orin NX 优化配置 (16GB)
 #   --orin-nano     使用 Orin Nano 极限优化配置 (8GB/低内存设备)
 #   --driver        启动 Livox MID360 驱动 (实时模式需要)
+#   --record-bag [PATH]  录制 rosbag (可选指定保存目录，默认当前目录)
 #   --config FILE   使用指定的配置文件
 #   --map-path PATH 指定地图保存路径 (默认: 源码目录/map/)
 #   --bag PATH      播放指定的 rosbag 文件
@@ -22,6 +23,7 @@
 #   ./run_slam.sh --orin --no-rviz --bag /path/to/data.db3 --rate 2.0
 #   ./run_slam.sh --orin --driver --no-rviz --map-path ~/map  # 实时建图
 #   ./run_slam.sh --orin-nano --driver --no-rviz              # Nano 实时建图
+#   ./run_slam.sh --driver --record-bag ~/bags --map-path ~/map  # 建图+录包
 #
 
 set -e
@@ -39,6 +41,8 @@ BAG_RATE="1.0"
 USE_ORIN=false
 USE_ORIN_NANO=false
 USE_DRIVER=false
+RECORD_BAG=false
+RECORD_BAG_PATH=""
 CUSTOM_CONFIG=""
 
 # 配置文件路径
@@ -77,6 +81,7 @@ show_help() {
     echo "  --orin              使用 Orin NX 优化配置 (16GB)"
     echo "  --orin-nano         使用 Orin Nano 极限优化配置 (8GB/低内存)"
     echo "  --driver            启动 Livox MID360 驱动 (实时模式需要)"
+    echo "  --record-bag [PATH] 录制 rosbag (可选指定保存目录，默认当前目录)"
     echo "  --config FILE       使用指定的配置文件"
     echo "  --map-path PATH     指定地图保存路径"
     echo "  --bag PATH          播放指定的 rosbag 文件"
@@ -88,6 +93,7 @@ show_help() {
     echo "  $0 --orin --no-rviz --bag /path/to/rosbag --rate 1.5"
     echo "  $0 --orin --driver --no-rviz --map-path ~/map  # 实时建图"
     echo "  $0 --orin-nano --driver --no-rviz              # Nano 实时建图"
+    echo "  $0 --driver --record-bag ~/bags --map-path ~/map  # 建图+录包"
     echo "  $0 --config /path/to/custom.yaml --map-path /tmp/slam_output/"
 }
 
@@ -113,6 +119,16 @@ while [[ $# -gt 0 ]]; do
         --driver)
             USE_DRIVER=true
             shift
+            ;;
+        --record-bag)
+            RECORD_BAG=true
+            # 检查下一个参数是否是路径（不以 -- 开头且存在下一个参数）
+            if [[ $# -ge 2 && "$2" != --* ]]; then
+                RECORD_BAG_PATH="$2"
+                shift 2
+            else
+                shift
+            fi
             ;;
         --config)
             CUSTOM_CONFIG="$2"
@@ -186,6 +202,22 @@ cleanup() {
     fi
     if [[ -n "$BAG_PID" ]] && kill -0 $BAG_PID 2>/dev/null; then
         kill $BAG_PID 2>/dev/null || true
+    fi
+    # 先停止录制（SIGINT 让 ros2 bag record 正常刷盘关闭）
+    if [[ -n "$RECORD_PID" ]] && kill -0 $RECORD_PID 2>/dev/null; then
+        log_info "停止 rosbag 录制..."
+        kill -INT $RECORD_PID 2>/dev/null || true
+        # 等待录制进程正常退出（最多10秒）
+        for i in $(seq 1 10); do
+            if ! kill -0 $RECORD_PID 2>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        if kill -0 $RECORD_PID 2>/dev/null; then
+            kill -9 $RECORD_PID 2>/dev/null || true
+        fi
+        log_info "rosbag 录制已保存"
     fi
     if [[ -n "$NODE_PID" ]] && kill -0 $NODE_PID 2>/dev/null; then
         kill -INT $NODE_PID 2>/dev/null || true
@@ -337,6 +369,35 @@ play_bag() {
     fi
 }
 
+# 录制 rosbag
+start_record_bag() {
+    if [[ "$RECORD_BAG" == true ]]; then
+        # 确定保存目录
+        local bag_dir="${RECORD_BAG_PATH:-.}"
+        mkdir -p "$bag_dir"
+
+        # 生成带时间戳的 bag 名称
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local bag_name="${bag_dir}/slam_record_${timestamp}"
+
+        log_info "开始录制 rosbag: $bag_name"
+        log_info "录制话题: /livox/lidar /livox/imu"
+
+        ros2 bag record \
+            /livox/lidar \
+            /livox/imu \
+            -o "$bag_name" &
+        RECORD_PID=$!
+
+        sleep 1
+        if ! kill -0 $RECORD_PID 2>/dev/null; then
+            log_error "rosbag 录制启动失败"
+            exit 1
+        fi
+        log_info "rosbag 录制已启动 (PID: $RECORD_PID)"
+    fi
+}
+
 # 显示运行信息
 show_status() {
     echo ""
@@ -349,6 +410,7 @@ show_status() {
     [[ "$USE_ORIN_NANO" == true ]] && echo -e "  模式:       ${YELLOW}Orin Nano 极限优化模式${NC}"
     echo -e "  Livox驱动:  $([ "$USE_DRIVER" == true ] && echo "启用" || echo "禁用")"
     echo -e "  RViz2:      $([ "$USE_RVIZ" == true ] && echo "启用" || echo "禁用")"
+    echo -e "  录制rosbag: $([ "$RECORD_BAG" == true ] && echo "启用 (${RECORD_BAG_PATH:-.})" || echo "禁用")"
     echo -e "  地图路径:   ${MAP_PATH:-"默认 (源码目录/map/)"}"
     echo -e "  rosbag:     ${BAG_PATH:-"未指定 (等待实时数据)"}"
     [[ -n "$BAG_PATH" ]] && echo -e "  播放速率:   ${BAG_RATE}x"
@@ -365,6 +427,7 @@ main() {
     start_driver
     start_slam_node
     start_rviz
+    start_record_bag
     play_bag
     show_status
     

@@ -162,6 +162,9 @@ cd ~/slam-mid360-volita/src/adaptive_lio/bash
 # 实时建图（自动启动 Livox 驱动）
 ./run_slam.sh --orin --driver --no-rviz --map-path ~/map
 
+# 实时建图 + 同时录制 rosbag
+./run_slam.sh --driver --record-bag ~/bags --map-path ~/map
+
 # 使用自定义配置
 ./run_slam.sh --config /path/to/custom.yaml
 ```
@@ -175,6 +178,7 @@ cd ~/slam-mid360-volita/src/adaptive_lio/bash
 | `--orin` | 使用 Orin NX 优化配置（16GB） |
 | `--orin-nano` | 使用 Orin Nano 极限优化配置（8GB/低内存设备） |
 | `--driver` | 启动 Livox MID360 驱动（实时建图时需要） |
+| `--record-bag [PATH]` | 录制 rosbag（可选指定保存目录，默认当前目录） |
 | `--config FILE` | 使用指定配置文件 |
 | `--map-path PATH` | 指定地图保存路径 |
 | `--bag PATH` | 播放指定 rosbag |
