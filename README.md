@@ -31,6 +31,7 @@
 - [参数调优](#参数调优)
 - [地图管理](#地图管理)
 - [性能监控](#性能监控)
+- [SDK 打包与分发](#sdk-打包与分发)
 - [常见问题](#常见问题)
 - [致谢](#致谢)
 
@@ -441,6 +442,151 @@ map/
 
 ---
 
+## SDK 打包与分发
+
+项目提供 `pack_sdk.sh` 脚本，在编译完成后一键打包为可分发的 SDK，无需源码即可在同架构设备上运行。
+
+### 打包前提
+
+1. 已完成 `colcon build` 编译
+2. 已安装 livox_ros_driver2（默认 `~/livox_ws`，可通过 `LIVOX_WS_PATH` 环境变量指定）
+
+### 打包脚本用法
+
+```bash
+cd ~/slam-mid360-volita
+
+# 基本打包 (输出到 ./sdk_arm64/ 或 ./sdk_x86_64/，自动检测架构)
+./pack_sdk.sh
+
+# 指定输出目录
+./pack_sdk.sh -o ~/my_sdk
+
+# 打包并生成 tar.gz 压缩包（方便 scp 传输）
+./pack_sdk.sh --tar
+
+# 指定输出目录 + 压缩包
+./pack_sdk.sh -o ~/release_sdk --tar
+```
+
+#### 打包脚本参数
+
+| 参数 | 说明 |
+|------|------|
+| `-o, --output DIR` | 指定 SDK 输出目录（默认: `./sdk_<arch>`） |
+| `--tar` | 额外生成 `.tar.gz` 压缩包 |
+| `-h, --help` | 显示帮助信息 |
+
+### SDK 目录结构
+
+打包完成后生成的 SDK 目录结构：
+
+```
+sdk_arm64/
+├── run.sh                  # SDK 启动脚本（直接执行，不依赖 colcon）
+├── check_env.sh            # 环境检查脚本（部署前运行）
+├── README.md               # SDK 使用说明
+├── bin/
+│   └── adaptive_lio_node   # SLAM 算法二进制文件
+├── config/
+│   ├── mapping_m.yaml          # 默认配置（x86/高性能设备）
+│   ├── mapping_orin_nx.yaml    # Orin NX 16GB 配置
+│   ├── mapping_orin_nano.yaml  # Orin Nano 8GB 配置
+│   └── adaptive_lio.rviz       # RViz2 布局
+├── lib/
+│   └── liblivox_ros_driver2*.so  # Livox 消息类型库
+├── launch/
+│   └── run.launch.py
+├── scripts/
+│   ├── gui_launcher.py     # GUI 控制面板
+│   ├── run_slam.sh         # 原始启动脚本（参考用）
+│   └── start_gui.sh
+├── share/                  # ROS2 包元数据
+└── map/                    # 默认地图输出目录
+```
+
+### 部署到其他设备
+
+#### 1. 传输 SDK
+
+```bash
+# 方式一：直接复制目录
+scp -r sdk_arm64/ user@target:~/sdk/
+
+# 方式二：传输压缩包（推荐，更快）
+scp adaptive_lio_sdk_arm64_20260319.tar.gz user@target:~/
+ssh user@target 'cd ~ && tar xzf adaptive_lio_sdk_arm64_*.tar.gz'
+```
+
+#### 2. 目标设备安装依赖
+
+```bash
+# 安装 ROS2 Humble (如未安装)
+# 参考: https://docs.ros.org/en/humble/Installation.html
+
+sudo apt install -y \
+    ros-humble-desktop \
+    libceres-dev \
+    libpcl-dev \
+    libgoogle-glog-dev \
+    libyaml-cpp-dev
+```
+
+#### 3. 环境检查
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/sdk
+./check_env.sh
+```
+
+`check_env.sh` 会逐项检查：ROS2 环境、系统库、SDK 文件完整性、二进制架构匹配、动态库链接。
+
+#### 4. 运行 SDK
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/sdk
+
+# Orin NX 实时建图
+./run.sh --orin --driver --no-rviz --map-path ~/map
+
+# Orin Nano 实时建图
+./run.sh --orin-nano --driver --no-rviz --map-path ~/map
+
+# 回放 rosbag
+./run.sh --bag /path/to/data.db3 --map-path ~/map
+
+# 实时建图 + 录制 rosbag
+./run.sh --orin --driver --record-bag ~/bags --no-rviz --map-path ~/map
+```
+
+### SDK run.sh 参数
+
+| 参数 | 说明 |
+|------|------|
+| `--rviz` | 启动 RViz2 可视化（默认） |
+| `--no-rviz` | 不启动 RViz2 |
+| `--orin` | 使用 Orin NX 优化配置（16GB） |
+| `--orin-nano` | 使用 Orin Nano 极限优化配置（8GB） |
+| `--driver` | 启动 Livox MID360 驱动 |
+| `--record-bag [PATH]` | 录制 rosbag（可选指定目录） |
+| `--config FILE` | 使用自定义配置文件 |
+| `--map-path PATH` | 地图保存路径（默认: sdk/map/） |
+| `--bag PATH` | 播放 rosbag |
+| `--rate RATE` | 播放速率（默认: 1.0） |
+
+> 选项之间顺序不限，可自由组合。
+
+### 注意事项
+
+- **架构绑定**：SDK 中的二进制文件与编译时的架构绑定（x86_64 或 aarch64），不可跨架构使用
+- **同架构通用**：在 ARM 设备上编译打包的 SDK，可直接部署到其他同架构 ARM 设备（如从一台 Orin NX 部署到另一台 Orin Nano）
+- **Livox 驱动**：`--driver` 模式需要目标设备上已安装 livox_ros_driver2（`~/livox_ws` 或设置 `LIVOX_WS_PATH`）
+- **自定义配置**：可复制 `config/mapping_m.yaml` 修改后通过 `--config` 参数使用
+
+---
+
 ## 常见问题
 
 ### Q: 编译时找不到 livox_ros_driver2
@@ -501,6 +647,7 @@ slam-mid360-volita/
 │   │   ├── algo/                 # ESKF 滤波器
 │   │   └── common/               # 工具库
 │   └── map/                      # 地图输出
+├── pack_sdk.sh                   # SDK 打包脚本
 └── README.md
 ```
 
