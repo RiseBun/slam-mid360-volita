@@ -80,6 +80,18 @@ namespace zjloc
                if (odometry_node["enable_mmap"])
                     options_.enable_mmap = odometry_node["enable_mmap"].as<bool>();
 
+               // Sliding window parameters
+               if (odometry_node["enable_sliding_window"])
+                    options_.enable_sliding_window = odometry_node["enable_sliding_window"].as<bool>();
+               if (odometry_node["near_range"])
+                    options_.near_range = odometry_node["near_range"].as<double>();
+               if (odometry_node["near_size_voxel_map"])
+                    options_.near_size_voxel_map = odometry_node["near_size_voxel_map"].as<double>();
+               if (odometry_node["near_min_distance_points"])
+                    options_.near_min_distance_points = odometry_node["near_min_distance_points"].as<double>();
+               if (odometry_node["near_max_num_points_in_voxel"])
+                    options_.near_max_num_points_in_voxel = odometry_node["near_max_num_points_in_voxel"].as<int>();
+
                std::string str_motion_compensation = odometry_node["motion_compensation"].as<std::string>();
                if (str_motion_compensation == "NONE")
                     options_.motion_compensation = MotionCompensation::NONE;
@@ -219,6 +231,17 @@ namespace zjloc
           solver_options_.trust_region_strategy_type = ceres::TrustRegionStrategyType::LEVENBERG_MARQUARDT;
           LOG(WARNING) << "Ceres solver: iterations=" << options_.ceres_iterations 
                        << ", threads=" << options_.ceres_threads;
+
+          // Sliding window validation
+          if (options_.enable_sliding_window) {
+               // Clamp near_range to at most half of max_distance
+               if (options_.near_range > options_.max_distance * 0.5)
+                    options_.near_range = options_.max_distance * 0.5;
+               LOG(WARNING) << "Sliding window enabled: near_range=" << options_.near_range
+                            << ", near_voxel=" << options_.near_size_voxel_map
+                            << ", near_min_dist=" << options_.near_min_distance_points
+                            << ", near_max_pts=" << options_.near_max_num_points_in_voxel;
+          }
 
           // Pre-allocate reusable Ceres objects (ownership NOT taken by Problem)
           huber_loss_ = new ceres::HuberLoss(0.5);
@@ -406,6 +429,7 @@ namespace zjloc
                {
                     double rss_mb = getRSSMB();
                     size_t voxel_count = voxel_map.size();
+                    size_t near_voxel_count = options_.enable_sliding_window ? voxel_map_near.size() : 0;
                     size_t mmap_voxels = options_.enable_mmap ? mmap->TotalVoxelCount() : 0;
                     size_t mmap_points = options_.enable_mmap ? mmap->NumPoints() : 0;
 
@@ -414,6 +438,7 @@ namespace zjloc
                               << "  frame_ms=" << std::fixed << std::setprecision(1) << frame_ms
                               << "  RSS=" << std::setprecision(1) << rss_mb << "MB"
                               << "  voxel_map=" << voxel_count
+                              << "  near_voxels=" << near_voxel_count
                               << "  mmap_voxels=" << mmap_voxels
                               << "  mmap_points=" << mmap_points
                               << ANSI_COLOR_RESET << std::endl;
@@ -921,12 +946,34 @@ namespace zjloc
                auto &keypoint = keypoints[k];
                auto &raw_point = keypoint.raw_point;
 
-               auto vector_neighbors = searchNeighbors(voxel_map, keypoint.point,
+               // Sliding window: near-field points search in fine-grained voxel_map_near first
+               std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> vector_neighbors;
+               bool used_near_map = false;
+               if (options_.enable_sliding_window)
+               {
+                    double sq_dist = (keypoint.point - p_frame->p_state->translation).squaredNorm();
+                    if (sq_dist < options_.near_range * options_.near_range)
+                    {
+                         vector_neighbors = searchNeighbors(voxel_map_near, keypoint.point,
+                                                            nb_voxels_visited,
+                                                            options_.near_size_voxel_map,
+                                                            options_.max_number_neighbors,
+                                                            kThresholdCapacity,
+                                                            nullptr);
+                         used_near_map = true;
+                    }
+               }
+
+               // Fallback to standard voxel_map if near map didn't find enough neighbors
+               if (!used_near_map || (int)vector_neighbors.size() < options_.min_number_neighbors)
+               {
+                    vector_neighbors = searchNeighbors(voxel_map, keypoint.point,
                                                        nb_voxels_visited,
                                                        options_.size_voxel_map,
                                                        options_.max_number_neighbors,
                                                        kThresholdCapacity,
                                                        nullptr);
+               }
 
                if (vector_neighbors.size() < options_.min_number_neighbors)
                     continue;
@@ -1181,6 +1228,20 @@ namespace zjloc
                              options_.size_voxel_map, options_.max_num_points_in_voxel,
                              options_.min_distance_points, min_num_points, p_frame);
 
+               // Sliding window: near-field points also inserted into fine-grained voxel_map_near
+               if (options_.enable_sliding_window)
+               {
+                    double sq_dist = (point.point - end_t).squaredNorm();
+                    if (sq_dist < options_.near_range * options_.near_range)
+                    {
+                         addPointToMap(voxel_map_near, point.point, point.intensity,
+                                      options_.near_size_voxel_map,
+                                      options_.near_max_num_points_in_voxel,
+                                      options_.near_min_distance_points,
+                                      0, p_frame);
+                    }
+               }
+
                if (options_.enable_mmap)
                     mmap->InsertPoint(point);
           }
@@ -1222,6 +1283,23 @@ namespace zjloc
 
           if (options_.enable_mmap)
                mmap->RemoveElementsFarFromLocation(location, options_.max_distance);
+
+          // Sliding window: clean up near voxel_map beyond near_range
+          if (options_.enable_sliding_window)
+          {
+               double sq_near_range = options_.near_range * options_.near_range;
+               std::vector<voxel> near_voxels_to_erase;
+               for (auto &pair : voxel_map_near)
+               {
+                    Eigen::Vector3d pt = pair.second.points[0];
+                    if ((pt - location).squaredNorm() > sq_near_range)
+                    {
+                         near_voxels_to_erase.push_back(pair.first);
+                    }
+               }
+               for (auto &vox : near_voxels_to_erase)
+                    voxel_map_near.erase(vox);
+          }
      }
 
      cloudFrame *lidarodom_m::buildFrame(std::vector<point3D> &const_surf, state *cur_state,

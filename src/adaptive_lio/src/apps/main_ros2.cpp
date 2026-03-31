@@ -9,6 +9,7 @@
 #include <random>
 #include <atomic>
 #include <unordered_map>
+#include <fstream>
 
 // ROS2 lib
 #include <rclcpp/rclcpp.hpp>
@@ -91,6 +92,9 @@ static inline builtin_interfaces::msg::Time fromSec(double t)
 class AdaptiveLioNode : public rclcpp::Node
 {
 public:
+    // Dense point: lightweight struct for full-resolution accumulation
+    struct DensePoint { float x, y, z, intensity; };
+
     // Hash-based voxel downsample: uses unordered_map to avoid int32 overflow
     // that occurs with PCL VoxelGrid on large-extent maps.
     static bool safeVoxelDownsample(
@@ -173,6 +177,10 @@ public:
         map_save_path_ = get_package_root_dir() + "map/";
         global_map_frame_count_ = 0;
         global_map_downsample_interval_ = 5;  // downsample every 5 frames (was 50)
+
+        // Dense map mode: full-resolution PCD export (no downsampling)
+        // SLAM tracking map stays lightweight; only the save/export branch changes.
+        dense_map_mode_ = false;
 
         // Segmented map saving for memory management
         segment_distance_threshold_ = 50.0;  // Save and clear map every 50 meters
@@ -264,6 +272,47 @@ public:
         }
         RCLCPP_INFO(this->get_logger(), "Map voxel size: %.3f m (smaller = denser points)", map_voxel_size_);
 
+        // Sliding window save map config
+        near_buffer_.reset(new pcl::PointCloud<pcl::PointXYZI>());
+        if (yaml["common"]["enable_save_sliding_window"])
+            enable_save_sliding_window_ = yaml["common"]["enable_save_sliding_window"].as<bool>();
+        if (yaml["common"]["save_near_range"])
+            save_near_range_ = yaml["common"]["save_near_range"].as<double>();
+        if (yaml["common"]["archive_trigger_distance"])
+            archive_trigger_distance_ = yaml["common"]["archive_trigger_distance"].as<double>();
+        if (yaml["common"]["max_near_buffer_points"])
+            max_near_buffer_points_ = yaml["common"]["max_near_buffer_points"].as<size_t>();
+        if (enable_save_sliding_window_)
+            RCLCPP_INFO(this->get_logger(), "Save sliding window: near_range=%.1f, archive_dist=%.1f, max_buffer=%zu",
+                        save_near_range_, archive_trigger_distance_, max_near_buffer_points_);
+
+        // Dense map mode config (YAML + env var override)
+        if (yaml["common"]["dense_map_mode"])
+            dense_map_mode_ = yaml["common"]["dense_map_mode"].as<bool>();
+        if (yaml["common"]["dense_save_segment_points"])
+            dense_save_segment_points_ = yaml["common"]["dense_save_segment_points"].as<size_t>();
+        if (yaml["common"]["dense_voxel_size"])
+            dense_voxel_size_ = yaml["common"]["dense_voxel_size"].as<float>();
+        // Environment variable override: ADAPTIVE_LIO_DENSE_MAP=1 forces dense mode
+        const char* dense_env = std::getenv("ADAPTIVE_LIO_DENSE_MAP");
+        if (dense_env != nullptr && std::string(dense_env) == "1")
+            dense_map_mode_ = true;
+        const char* voxel_env = std::getenv("ADAPTIVE_LIO_DENSE_VOXEL");
+        if (voxel_env != nullptr)
+            dense_voxel_size_ = std::stof(std::string(voxel_env));
+        if (dense_map_mode_)
+        {
+            dense_buffer_.reserve(dense_save_segment_points_);
+            RCLCPP_INFO(this->get_logger(),
+                        "Dense map mode ENABLED: segment=%zu pts, merge_voxel=%.3f %s",
+                        dense_save_segment_points_, dense_voxel_size_,
+                        dense_voxel_size_ > 0 ? "(downsample on merge)" : "(raw, no downsample)");
+        }
+        else
+        {
+            RCLCPP_INFO(this->get_logger(), "Dense map mode DISABLED (sparse mode with downsampling)");
+        }
+
         // Open trajectory file AFTER map_save_path_ is finalized
         {
             std::string mkdir_cmd = "mkdir -p " + map_save_path_;
@@ -327,50 +376,75 @@ public:
             save_thread_.join();
         if (segment_save_thread_.joinable())
             segment_save_thread_.join();
+        if (dense_save_thread_.joinable())
+            dense_save_thread_.join();
 
-        // Auto-save remaining map as final segment
+        if (dense_map_mode_)
         {
-            std::lock_guard<std::mutex> lock(map_mutex_);
-            if (global_map_ && !global_map_->empty())
-            {
-                std::string cmd = "mkdir -p " + map_save_path_;
-                system(cmd.c_str());
+            // Dense mode: flush remaining buffer as final segment, then stream-merge
+            if (!dense_buffer_.empty())
+                saveDenseSegmentSync();
 
-                // Save remaining points as final segment
-                std::string segment_path = map_save_path_ + "segment_" + 
-                                           std::to_string(segment_index_) + ".pcd";
-                auto start = std::chrono::steady_clock::now();
-                if (pcl::io::savePCDFileBinary(segment_path, *global_map_) == 0)
-                {
-                    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                          std::chrono::steady_clock::now() - start)
-                                          .count();
-                    RCLCPP_INFO(this->get_logger(),
-                                "[Memory Management] Final segment %d saved: %s (%zu points, %.1fs)",
-                                segment_index_, segment_path.c_str(), global_map_->size(), elapsed_ms / 1000.0);
-                    has_saved_any_data_ = true;
-                }
-            }
-        }
-
-        // Merge all segments into final global_map.pcd (only if we have data and merge is needed)
-        if (has_saved_any_data_)
-        {
-            // Skip merge if we already did a manual save and no new segments were created
-            if (last_merged_segment_index_ >= 0 && segment_index_ == last_merged_segment_index_)
-            {
-                RCLCPP_INFO(this->get_logger(),
-                            "[Memory Management] Skipping redundant merge (already merged up to segment_%d)",
-                            last_merged_segment_index_);
-            }
+            if (dense_segment_index_ > 0)
+                mergeDenseSegments();
             else
-            {
-                mergeAllSegments();
-            }
+                RCLCPP_INFO(this->get_logger(), "[Dense] No dense segments to merge");
         }
         else
         {
-            RCLCPP_INFO(this->get_logger(), "[Memory Management] No data was processed, skipping merge");
+            // Sparse mode: original map saving logic
+            if (enable_save_sliding_window_ && near_buffer_ && !near_buffer_->empty())
+            {
+                std::lock_guard<std::mutex> lock(map_mutex_);
+                pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
+                if (safeVoxelDownsample(near_buffer_, filtered, map_voxel_size_))
+                    *global_map_ += *filtered;
+                else
+                    *global_map_ += *near_buffer_;
+                near_buffer_->clear();
+                RCLCPP_INFO(this->get_logger(), "[Memory Management] Flushed near_buffer_ to global_map_ before final save");
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(map_mutex_);
+                if (global_map_ && !global_map_->empty())
+                {
+                    std::string cmd = "mkdir -p " + map_save_path_;
+                    system(cmd.c_str());
+
+                    std::string segment_path = map_save_path_ + "segment_" + 
+                                               std::to_string(segment_index_) + ".pcd";
+                    auto start = std::chrono::steady_clock::now();
+                    if (pcl::io::savePCDFileBinary(segment_path, *global_map_) == 0)
+                    {
+                        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                              std::chrono::steady_clock::now() - start)
+                                              .count();
+                        RCLCPP_INFO(this->get_logger(),
+                                    "[Memory Management] Final segment %d saved: %s (%zu points, %.1fs)",
+                                    segment_index_, segment_path.c_str(), global_map_->size(), elapsed_ms / 1000.0);
+                        has_saved_any_data_ = true;
+                    }
+                }
+            }
+
+            if (has_saved_any_data_)
+            {
+                if (last_merged_segment_index_ >= 0 && segment_index_ == last_merged_segment_index_)
+                {
+                    RCLCPP_INFO(this->get_logger(),
+                                "[Memory Management] Skipping redundant merge (already merged up to segment_%d)",
+                                last_merged_segment_index_);
+                }
+                else
+                {
+                    mergeAllSegments();
+                }
+            }
+            else
+            {
+                RCLCPP_INFO(this->get_logger(), "[Memory Management] No data was processed, skipping merge");
+            }
         }
 
         // Signal processing thread to stop and discard queued data
@@ -504,16 +578,51 @@ private:
                 if (topic_name == "laser")
                 {
                     pub_scan_->publish(cloud_msg);
-                    // Accumulate to global map with aggressive periodic downsampling
-                    std::lock_guard<std::mutex> lock(map_mutex_);
-                    *global_map_ += *cloud;
-                    global_map_frame_count_++;
-                    // Downsample every 5 frames to keep map export-ready at all times
-                    if (global_map_frame_count_ % global_map_downsample_interval_ == 0)
+
+                    if (dense_map_mode_)
                     {
-                        pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
-                        if (safeVoxelDownsample(global_map_, filtered, map_voxel_size_))
-                            global_map_.swap(filtered);
+                        // Dense mode: accumulate raw points without any downsampling
+                        for (const auto &pt : cloud->points)
+                        {
+                            if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z))
+                                continue;
+                            dense_buffer_.push_back({pt.x, pt.y, pt.z, pt.intensity});
+                        }
+                        dense_total_points_ += cloud->size();
+
+                        // Trigger async segment save when buffer is full
+                        if (dense_buffer_.size() >= dense_save_segment_points_)
+                            saveDenseSegment();
+                    }
+                    else
+                    {
+                        std::lock_guard<std::mutex> lock(map_mutex_);
+
+                        if (enable_save_sliding_window_)
+                        {
+                            // Sliding window: accumulate into near_buffer_ without downsampling
+                            *near_buffer_ += *cloud;
+
+                            // Memory protection: lightweight downsample if buffer exceeds limit
+                            if (near_buffer_->size() > max_near_buffer_points_)
+                            {
+                                pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
+                                if (safeVoxelDownsample(near_buffer_, filtered, 0.02f))
+                                    near_buffer_.swap(filtered);
+                            }
+                        }
+                        else
+                        {
+                            // Original logic: accumulate and periodically downsample
+                            *global_map_ += *cloud;
+                            global_map_frame_count_++;
+                            if (global_map_frame_count_ % global_map_downsample_interval_ == 0)
+                            {
+                                pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
+                                if (safeVoxelDownsample(global_map_, filtered, map_voxel_size_))
+                                    global_map_.swap(filtered);
+                            }
+                        }
                     }
                 }
                 return true;
@@ -578,8 +687,12 @@ private:
                                                        q_current.x(), q_current.y(), q_current.z(), q_current.w());
                     }
 
-                    // Check if we need to save segment and clear memory
-                    checkAndSaveSegment(current_pos);
+                    // Sparse mode: archive far-away points and check segment save
+                    if (!dense_map_mode_)
+                    {
+                        archiveNearBuffer(current_pos);
+                        checkAndSaveSegment(current_pos);
+                    }
                 }
                 else if (topic_name == "world")
                 {
@@ -846,6 +959,228 @@ private:
             segment_save_in_progress_ = false; });
     }
 
+    // ---- Dense map mode methods ----
+
+    // Async: swap buffer and save segment in background thread
+    void saveDenseSegment()
+    {
+        if (dense_save_in_progress_.load() || dense_buffer_.empty())
+            return;
+
+        // Move buffer out; re-reserve for next batch
+        std::vector<DensePoint> save_data;
+        save_data.swap(dense_buffer_);
+        dense_buffer_.reserve(dense_save_segment_points_);
+
+        dense_save_in_progress_ = true;
+        int current_segment = dense_segment_index_++;
+
+        if (dense_save_thread_.joinable())
+            dense_save_thread_.join();
+
+        dense_save_thread_ = std::thread([this, save_data = std::move(save_data), current_segment]()
+        {
+            writeDenseSegmentFile(save_data, current_segment);
+            dense_save_in_progress_ = false;
+        });
+    }
+
+    // Sync: save remaining buffer (called from destructor)
+    void saveDenseSegmentSync()
+    {
+        if (dense_buffer_.empty())
+            return;
+
+        if (dense_save_thread_.joinable())
+            dense_save_thread_.join();
+
+        int current_segment = dense_segment_index_++;
+        writeDenseSegmentFile(dense_buffer_, current_segment);
+        dense_buffer_.clear();
+    }
+
+    // Write a dense segment to PCD file
+    void writeDenseSegmentFile(const std::vector<DensePoint> &points, int segment_idx)
+    {
+        std::string cmd = "mkdir -p " + map_save_path_;
+        system(cmd.c_str());
+
+        pcl::PointCloud<pcl::PointXYZI> cloud;
+        cloud.resize(points.size());
+        for (size_t i = 0; i < points.size(); i++)
+        {
+            cloud.points[i].x = points[i].x;
+            cloud.points[i].y = points[i].y;
+            cloud.points[i].z = points[i].z;
+            cloud.points[i].intensity = points[i].intensity;
+        }
+        cloud.width = cloud.size();
+        cloud.height = 1;
+        cloud.is_dense = true;
+
+        std::string path = map_save_path_ + "dense_segment_" + std::to_string(segment_idx) + ".pcd";
+        auto start = std::chrono::steady_clock::now();
+        if (pcl::io::savePCDFileBinary(path, cloud) == 0)
+        {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start).count();
+            RCLCPP_INFO(this->get_logger(),
+                "[Dense] Segment %d saved: %s (%zu points, %.1fs)",
+                segment_idx, path.c_str(), cloud.size(), elapsed / 1000.0);
+        }
+        else
+        {
+            RCLCPP_ERROR(this->get_logger(), "[Dense] Failed to save segment %d", segment_idx);
+        }
+    }
+
+    // Stream-based merge: read binary data segment by segment without full-memory load
+    void mergeDenseSegments()
+    {
+        if (dense_segment_index_ <= 0)
+        {
+            RCLCPP_INFO(this->get_logger(), "[Dense] No segments to merge");
+            return;
+        }
+
+        const bool do_downsample = (dense_voxel_size_ > 0.0f);
+        RCLCPP_INFO(this->get_logger(), "[Dense] Merging %d segments %s...",
+                    dense_segment_index_,
+                    do_downsample ? ("(voxel=" + std::to_string(dense_voxel_size_) + "m)").c_str() : "(raw)");
+
+        std::string final_path = map_save_path_ + "global_map.pcd";
+        auto merge_start = std::chrono::steady_clock::now();
+
+        if (!do_downsample)
+        {
+            // ---- Fast path: stream raw binary, no PCL loading ----
+            size_t total_points = 0;
+            int valid_segments = 0;
+            for (int i = 0; i < dense_segment_index_; i++)
+            {
+                std::string path = map_save_path_ + "dense_segment_" + std::to_string(i) + ".pcd";
+                pcl::PCLPointCloud2 cloud2;
+                Eigen::Vector4f origin;
+                Eigen::Quaternionf orientation;
+                int version, type;
+                unsigned int data_idx;
+                pcl::PCDReader reader;
+                if (reader.readHeader(path, cloud2, origin, orientation, version, type, data_idx) == 0)
+                {
+                    total_points += cloud2.width * cloud2.height;
+                    valid_segments++;
+                }
+            }
+            if (total_points == 0) { RCLCPP_WARN(this->get_logger(), "[Dense] No points"); return; }
+
+            std::ofstream ofs(final_path, std::ios::binary);
+            if (!ofs.is_open()) { RCLCPP_ERROR(this->get_logger(), "[Dense] Cannot open %s", final_path.c_str()); return; }
+
+            ofs << "# .PCD v0.7 - Point Cloud Data file format\n"
+                << "VERSION 0.7\nFIELDS x y z intensity\nSIZE 4 4 4 4\n"
+                << "TYPE F F F F\nCOUNT 1 1 1 1\n"
+                << "WIDTH " << total_points << "\nHEIGHT 1\n"
+                << "VIEWPOINT 0 0 0 1 0 0 0\nPOINTS " << total_points << "\nDATA binary\n";
+
+            for (int i = 0; i < dense_segment_index_; i++)
+            {
+                std::string path = map_save_path_ + "dense_segment_" + std::to_string(i) + ".pcd";
+                std::ifstream ifs(path, std::ios::binary);
+                if (!ifs.is_open()) continue;
+                std::string line;
+                while (std::getline(ifs, line))
+                    if (line.find("DATA binary") != std::string::npos) break;
+                const size_t CHUNK = 1024 * 1024;
+                std::vector<char> buf(CHUNK);
+                while (ifs.good()) { ifs.read(buf.data(), CHUNK); auto n = ifs.gcount(); if (n > 0) ofs.write(buf.data(), n); }
+                RCLCPP_INFO(this->get_logger(), "[Dense] Streamed segment %d", i);
+            }
+            ofs.close();
+
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - merge_start).count();
+            RCLCPP_INFO(this->get_logger(),
+                "\n============================================================\n"
+                "  DENSE MAP MERGE COMPLETE (RAW, NO DOWNSAMPLE)\n"
+                "  Output: %s\n"
+                "  Points: %zu  |  Segments: %d  |  Time: %.1fs\n"
+                "============================================================",
+                final_path.c_str(), total_points, valid_segments, elapsed / 1000.0);
+        }
+        else
+        {
+            // ---- Downsample path: load each segment, voxel filter, write to temp, then assemble ----
+            std::string tmp_path = final_path + ".tmp";
+            std::ofstream tmp(tmp_path, std::ios::binary);
+            if (!tmp.is_open()) { RCLCPP_ERROR(this->get_logger(), "[Dense] Cannot open tmp"); return; }
+
+            size_t total_points = 0;
+            int valid_segments = 0;
+            pcl::PCDReader reader;
+
+            for (int i = 0; i < dense_segment_index_; i++)
+            {
+                std::string path = map_save_path_ + "dense_segment_" + std::to_string(i) + ".pcd";
+                pcl::PointCloud<pcl::PointXYZI>::Ptr seg(new pcl::PointCloud<pcl::PointXYZI>());
+                if (reader.read(path, *seg) != 0 || seg->empty())
+                    continue;
+
+                size_t before = seg->size();
+                pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
+                if (safeVoxelDownsample(seg, filtered, dense_voxel_size_))
+                    seg = filtered;
+
+                // Write raw binary: each point = 16 bytes (x,y,z,intensity as float)
+                for (const auto &pt : seg->points)
+                {
+                    tmp.write(reinterpret_cast<const char*>(&pt.x), 4);
+                    tmp.write(reinterpret_cast<const char*>(&pt.y), 4);
+                    tmp.write(reinterpret_cast<const char*>(&pt.z), 4);
+                    tmp.write(reinterpret_cast<const char*>(&pt.intensity), 4);
+                }
+
+                total_points += seg->size();
+                valid_segments++;
+                RCLCPP_INFO(this->get_logger(), "[Dense] Segment %d: %zu -> %zu pts (voxel=%.3f)",
+                            i, before, seg->size(), dense_voxel_size_);
+            }
+            tmp.close();
+
+            if (total_points == 0)
+            {
+                std::remove(tmp_path.c_str());
+                RCLCPP_WARN(this->get_logger(), "[Dense] No points after downsample");
+                return;
+            }
+
+            // Assemble final PCD: header + tmp binary data
+            std::ofstream ofs(final_path, std::ios::binary);
+            ofs << "# .PCD v0.7 - Point Cloud Data file format\n"
+                << "VERSION 0.7\nFIELDS x y z intensity\nSIZE 4 4 4 4\n"
+                << "TYPE F F F F\nCOUNT 1 1 1 1\n"
+                << "WIDTH " << total_points << "\nHEIGHT 1\n"
+                << "VIEWPOINT 0 0 0 1 0 0 0\nPOINTS " << total_points << "\nDATA binary\n";
+
+            std::ifstream tmp_in(tmp_path, std::ios::binary);
+            const size_t CHUNK = 1024 * 1024;
+            std::vector<char> buf(CHUNK);
+            while (tmp_in.good()) { tmp_in.read(buf.data(), CHUNK); auto n = tmp_in.gcount(); if (n > 0) ofs.write(buf.data(), n); }
+            tmp_in.close();
+            ofs.close();
+            std::remove(tmp_path.c_str());
+
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - merge_start).count();
+            RCLCPP_INFO(this->get_logger(),
+                "\n============================================================\n"
+                "  DENSE MAP MERGE COMPLETE (VOXEL=%.3f)\n"
+                "  Output: %s\n"
+                "  Points: %zu  |  Segments: %d  |  Time: %.1fs\n"
+                "============================================================",
+                dense_voxel_size_, final_path.c_str(), total_points, valid_segments, elapsed / 1000.0);
+        }
+    }
+
     // Core algorithm
     zjloc::lidarodom_m *lio_ = nullptr;
     zjloc::CloudConvert2 *convert_ = nullptr;
@@ -870,6 +1205,16 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_vel_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_dist_;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_imu_repub_;
+
+    // Dense map mode: full-resolution PCD export (no downsampling)
+    bool dense_map_mode_ = false;
+    float dense_voxel_size_ = 0.0f;   // 0=raw, >0=downsample on merge
+    size_t dense_save_segment_points_ = 2000000;  // 2M points per segment (~32MB)
+    std::vector<DensePoint> dense_buffer_;
+    int dense_segment_index_ = 0;
+    size_t dense_total_points_ = 0;
+    std::thread dense_save_thread_;
+    std::atomic<bool> dense_save_in_progress_{false};
 
     // Map saving
     pcl::PointCloud<pcl::PointXYZI>::Ptr global_map_;
@@ -898,6 +1243,71 @@ private:
 
     // Trajectory saving
     std::fstream traj_fout_;
+
+    // Sliding window for saved map - preserves near-field detail
+    bool enable_save_sliding_window_ = false;
+    double save_near_range_ = 30.0;
+    double archive_trigger_distance_ = 10.0;
+    size_t max_near_buffer_points_ = 3000000;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr near_buffer_;
+    Eigen::Vector3d last_archive_position_;
+    bool archive_initialized_ = false;
+
+    // Archive near_buffer_: move far-away points into global_map_ with downsampling
+    void archiveNearBuffer(const Eigen::Vector3d &current_pos)
+    {
+        if (!enable_save_sliding_window_)
+            return;
+
+        if (!archive_initialized_)
+        {
+            last_archive_position_ = current_pos;
+            archive_initialized_ = true;
+            return;
+        }
+
+        if ((current_pos - last_archive_position_).norm() < archive_trigger_distance_)
+            return;
+
+        last_archive_position_ = current_pos;
+
+        std::lock_guard<std::mutex> lock(map_mutex_);
+        if (!near_buffer_ || near_buffer_->empty())
+            return;
+
+        double sq_range = save_near_range_ * save_near_range_;
+        pcl::PointCloud<pcl::PointXYZI>::Ptr keep(new pcl::PointCloud<pcl::PointXYZI>());
+        pcl::PointCloud<pcl::PointXYZI>::Ptr archive(new pcl::PointCloud<pcl::PointXYZI>());
+
+        keep->reserve(near_buffer_->size());
+        archive->reserve(near_buffer_->size() / 4);
+
+        for (const auto &pt : near_buffer_->points)
+        {
+            double dx = pt.x - current_pos.x();
+            double dy = pt.y - current_pos.y();
+            double dz = pt.z - current_pos.z();
+            if (dx * dx + dy * dy + dz * dz <= sq_range)
+                keep->points.push_back(pt);
+            else
+                archive->points.push_back(pt);
+        }
+
+        if (!archive->empty())
+        {
+            archive->width = archive->size();
+            archive->height = 1;
+            pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
+            if (safeVoxelDownsample(archive, filtered, map_voxel_size_))
+                *global_map_ += *filtered;
+            else
+                *global_map_ += *archive;
+        }
+
+        keep->width = keep->size();
+        keep->height = 1;
+        near_buffer_.swap(keep);
+    }
 };
 
 int main(int argc, char **argv)

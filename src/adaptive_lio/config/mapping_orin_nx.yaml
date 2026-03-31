@@ -13,8 +13,13 @@ common:
   imu_topic: /livox/imu
   lid_topic: /livox/lidar
   gnorm: 1
-  map_save_path: ""
+  map_save_path: "/home/lipeinan40355/map/"
   map_voxel_size: 0.1  # 增大体素 (默认0.05)，降低地图密度
+  # Sliding window saved map (preserves near-field detail)
+  enable_save_sliding_window: true
+  save_near_range: 25.0
+  archive_trigger_distance: 10.0
+  max_near_buffer_points: 2000000
 
 mapping:
   extrinsic_est_en: true
@@ -81,3 +86,10 @@ odometry:
   satu_gyro: 16
 
   enable_mmap: false  # Multi-resolution map disabled (saves 50-200MB on edge devices)
+
+  # Sliding window ICP map (fine-grained near-field voxel map)
+  enable_sliding_window: true
+  near_range: 20.0
+  near_size_voxel_map: 0.3
+  near_min_distance_points: 0.08
+  near_max_num_points_in_voxel: 25

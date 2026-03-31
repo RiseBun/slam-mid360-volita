@@ -74,6 +74,15 @@ namespace zjloc
           // Multi-resolution map (mmap) toggle.
           // When false, mmap is not updated, saving significant memory and CPU.
           bool enable_mmap = false;
+
+          // Sliding window map parameters
+          // When enabled, a second high-resolution voxel_map_near is maintained
+          // for the local area around the robot, improving ICP matching precision.
+          bool enable_sliding_window = false;
+          double near_range = 20.0;                    // Near-field range (m)
+          double near_size_voxel_map = 0.25;           // Near-field voxel size
+          double near_min_distance_points = 0.06;      // Near-field min distance between points
+          int near_max_num_points_in_voxel = 35;       // Near-field max points per voxel
      };
 
      class lidarodom_m
@@ -179,6 +188,7 @@ namespace zjloc
           CloudConvertInterface *convert = nullptr;
 
           voxelHashMap voxel_map;
+          voxelHashMap voxel_map_near;  // Near-field fine-grained voxel map (sliding window)
           MultipleResolutionVoxelMap *mmap;
 
           Eigen::Matrix3d R_imu_lidar = Eigen::Matrix3d::Identity(); //   lidar 转换到 imu坐标系下

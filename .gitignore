@@ -18,3 +18,15 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Map outputs (keep directory, ignore data)
+src/adaptive_lio/map/*.pcd
+src/adaptive_lio/map/*.ply
+src/adaptive_lio/map/*.txt
+src/adaptive_lio/log/*.txt
+
+# Config backups
+*.bak.*
+
+# Qoder
+.qoder/

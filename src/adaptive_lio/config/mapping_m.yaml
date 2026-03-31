@@ -14,6 +14,16 @@ common:
   gnorm: 1 # 9.805    # 部分数据，加速度模长为1->9.805gnorm
   map_save_path: ""  # 地图保存路径，空字符串表示使用默认路径（源码目录下的map文件夹）
   map_voxel_size: 0.05  # 地图降采样体素大小(米)，越小点越密集，默认0.1，建议0.02-0.2
+  # Sliding window saved map (preserves near-field detail)
+  enable_save_sliding_window: true
+  save_near_range: 30.0          # Near-field range for saved map (m)
+  archive_trigger_distance: 10.0 # Archive far points every N meters moved
+  max_near_buffer_points: 5000000
+  # Dense map mode: save full-resolution PCD (no downsampling on export branch)
+  # SLAM tracking map stays lightweight; only the save/export changes.
+  dense_map_mode: false              # Set to true for full-resolution PCD output
+  dense_save_segment_points: 2000000 # Points per dense segment (~32MB each)
+  dense_voxel_size: 0.0              # Merge downsample: 0=raw, 0.01=1cm, 0.02=2cm
 
 mapping:
   extrinsic_est_en: true
@@ -78,3 +88,10 @@ odometry:
   satu_gyro: 16 # the saturation value of IMU's angular velocity. not related to the units
 
   enable_mmap: false  # Multi-resolution map (unused by current ICP path, disable to save memory)
+
+  # Sliding window ICP map (fine-grained near-field voxel map)
+  enable_sliding_window: true
+  near_range: 25.0                   # Near-field range for ICP matching (m)
+  near_size_voxel_map: 0.25          # Near-field voxel size
+  near_min_distance_points: 0.06     # Near-field min distance between points
+  near_max_num_points_in_voxel: 35   # Near-field max points per voxel

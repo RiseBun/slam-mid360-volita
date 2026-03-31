@@ -12,6 +12,10 @@
 #   --orin-nano     使用 Orin Nano 极限优化配置 (8GB/低内存设备)
 #   --driver        启动 Livox MID360 驱动 (实时模式需要)
 #   --record-bag [PATH]  录制 rosbag (可选指定保存目录，默认当前目录)
+#   --dense [VOXEL]   启用 dense_map_mode（全分辨率PCD输出，无降采样）
+#                     可选 VOXEL 参数指定合并时降采样体素大小（米）
+#                     例: --dense 0.02 表示 2cm 体素降采样
+#                     不带参数则不降采样（原始全量点）
 #   --config FILE   使用指定的配置文件
 #   --map-path PATH 指定地图保存路径 (默认: 源码目录/map/)
 #   --bag PATH      播放指定的 rosbag 文件
@@ -24,6 +28,8 @@
 #   ./run_slam.sh --orin --driver --no-rviz --map-path ~/map  # 实时建图
 #   ./run_slam.sh --orin-nano --driver --no-rviz              # Nano 实时建图
 #   ./run_slam.sh --driver --record-bag ~/bags --map-path ~/map  # 建图+录包
+#   ./run_slam.sh --orin --driver --dense --no-rviz             # 全分辨率PCD（不降采样）
+#   ./run_slam.sh --orin --driver --dense 0.02 --no-rviz       # 2cm体素降采样PCD
 #
 
 set -e
@@ -41,6 +47,8 @@ BAG_RATE="1.0"
 USE_ORIN=false
 USE_ORIN_NANO=false
 USE_DRIVER=false
+USE_DENSE=false
+DENSE_VOXEL=""
 RECORD_BAG=false
 RECORD_BAG_PATH=""
 CUSTOM_CONFIG=""
@@ -81,6 +89,7 @@ show_help() {
     echo "  --orin              使用 Orin NX 优化配置 (16GB)"
     echo "  --orin-nano         使用 Orin Nano 极限优化配置 (8GB/低内存)"
     echo "  --driver            启动 Livox MID360 驱动 (实时模式需要)"
+    echo "  --dense             启用 dense_map_mode (全分辨率PCD输出)"
     echo "  --record-bag [PATH] 录制 rosbag (可选指定保存目录，默认当前目录)"
     echo "  --config FILE       使用指定的配置文件"
     echo "  --map-path PATH     指定地图保存路径"
@@ -119,6 +128,16 @@ while [[ $# -gt 0 ]]; do
         --driver)
             USE_DRIVER=true
             shift
+            ;;
+        --dense)
+            USE_DENSE=true
+            # 检查下一个参数是否是数字（体素大小）
+            if [[ $# -ge 2 && "$2" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+                DENSE_VOXEL="$2"
+                shift 2
+            else
+                shift
+            fi
             ;;
         --record-bag)
             RECORD_BAG=true
@@ -257,6 +276,12 @@ check_environment() {
         exit 1
     fi
     
+    # source livox 工作空间 (节点订阅 Livox CustomMsg，无论是否启动驱动都需要)
+    LIVOX_WS="${LIVOX_WS_PATH:-$HOME/livox_ws}"
+    if [[ -f "$LIVOX_WS/install/setup.bash" ]]; then
+        source "$LIVOX_WS/install/setup.bash"
+    fi
+
     # source 工作空间
     source "$WS_DIR/install/setup.bash"
     
@@ -324,6 +349,17 @@ start_slam_node() {
     
     # 设置配置文件环境变量
     export ADAPTIVE_LIO_CONFIG="$CONFIG_FILE"
+    
+    # dense 模式：通过环境变量启用 (比 sed 修改 YAML 更可靠)
+    if [[ "$USE_DENSE" == true ]]; then
+        export ADAPTIVE_LIO_DENSE_MAP=1
+        if [[ -n "$DENSE_VOXEL" ]]; then
+            export ADAPTIVE_LIO_DENSE_VOXEL="$DENSE_VOXEL"
+            log_info "Dense map mode 已启用 (合并时 ${DENSE_VOXEL}m 体素降采样)"
+        else
+            log_info "Dense map mode 已启用 (全分辨率PCD，无降采样)"
+        fi
+    fi
     
     ros2 run adaptive_lio adaptive_lio_node &
     NODE_PID=$!
@@ -410,12 +446,24 @@ show_status() {
     [[ "$USE_ORIN_NANO" == true ]] && echo -e "  模式:       ${YELLOW}Orin Nano 极限优化模式${NC}"
     echo -e "  Livox驱动:  $([ "$USE_DRIVER" == true ] && echo "启用" || echo "禁用")"
     echo -e "  RViz2:      $([ "$USE_RVIZ" == true ] && echo "启用" || echo "禁用")"
+    if [[ "$USE_DENSE" == true ]]; then
+        if [[ -n "$DENSE_VOXEL" ]]; then
+            echo -e "  Dense模式:  ${GREEN}启用 (${DENSE_VOXEL}m 体素降采样)${NC}"
+        else
+            echo -e "  Dense模式:  ${GREEN}启用 (全分辨率，无降采样)${NC}"
+        fi
+    else
+        echo -e "  Dense模式:  禁用"
+    fi
     echo -e "  录制rosbag: $([ "$RECORD_BAG" == true ] && echo "启用 (${RECORD_BAG_PATH:-.})" || echo "禁用")"
     echo -e "  地图路径:   ${MAP_PATH:-"默认 (源码目录/map/)"}"
     echo -e "  rosbag:     ${BAG_PATH:-"未指定 (等待实时数据)"}"
     [[ -n "$BAG_PATH" ]] && echo -e "  播放速率:   ${BAG_RATE}x"
     echo ""
     echo -e "  ${YELLOW}保存地图:${NC} ros2 service call /save_map std_srvs/srv/Trigger"
+    if [[ "$USE_DENSE" == true ]]; then
+        echo -e "  ${CYAN}(全分辨率点云，无降采样，分段保存，退出时自动流式合并)${NC}"
+    fi
     echo -e "  ${YELLOW}退出:${NC} Ctrl+C"
     echo ""
 }
