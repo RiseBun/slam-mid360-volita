@@ -15,6 +15,10 @@
 #   ./pack_sdk.sh --tar                    # 打包后额外生成 .tar.gz 压缩包
 #   ./pack_sdk.sh -o ~/sdk --tar           # 指定目录 + 生成压缩包
 #
+# 参数:
+#   -o, --output DIR   指定 SDK 输出目录 (默认: ./sdk_<arch>)
+#   --tar              打包后生成 .tar.gz 压缩包
+#   -h, --help         显示帮助信息
 
 set -e
 
@@ -172,7 +176,33 @@ echo ""
 log_step "开始打包..."
 
 # ==================== 创建目录结构 ====================
-rm -rf "$OUTPUT_DIR"
+# 安全检查：防止误删重要目录
+if [[ -z "$OUTPUT_DIR" ]]; then
+    log_error "OUTPUT_DIR 为空，拒绝执行"
+    exit 1
+fi
+
+# 禁止删除危险目录
+case "$OUTPUT_DIR" in
+    /|/home|/root|/usr|/etc|/var|/tmp|"$HOME"|"$HOME"/*)
+        # 允许删除 $HOME 下的子目录，但需要额外确认
+        if [[ "$OUTPUT_DIR" == "$HOME" ]]; then
+            log_error "禁止删除家目录: $OUTPUT_DIR"
+            exit 1
+        fi
+        ;;
+esac
+
+# 如果目录存在，安全地清空而不是删除重建
+if [[ -d "$OUTPUT_DIR" ]]; then
+    log_warn "输出目录已存在，将清空: $OUTPUT_DIR"
+    # 使用 find 删除内容但不删除目录本身
+    find "$OUTPUT_DIR" -mindepth 1 -delete 2>/dev/null || true
+else
+    mkdir -p "$OUTPUT_DIR"
+fi
+
+# 创建必需的子目录
 mkdir -p "$OUTPUT_DIR"/{bin,lib,config,launch,scripts,share/adaptive_lio/{config,launch,environment},share/livox_ros_driver2,share/ament_index/resource_index/packages,map}
 
 # ==================== 复制文件 ====================
@@ -246,6 +276,7 @@ cat > "$OUTPUT_DIR/run.sh" << 'RUNSCRIPT_EOF'
 #   --map-path PATH         地图保存路径 (默认: sdk/map/)
 #   --bag PATH              播放 rosbag
 #   --rate RATE             播放速率 (默认: 1.0)
+#   --dense [VOXEL]         Dense 模式（全分辨率PCD输出，可选体素大小）
 #   -h, --help              显示帮助
 #
 
@@ -264,6 +295,8 @@ BAG_RATE="1.0"
 USE_ORIN=false
 USE_ORIN_NANO=false
 USE_DRIVER=false
+USE_DENSE=false
+DENSE_VOXEL=""
 RECORD_BAG=false
 RECORD_BAG_PATH=""
 CUSTOM_CONFIG=""
@@ -300,6 +333,7 @@ show_help() {
     echo "  --orin              使用 Orin NX 优化配置 (16GB)"
     echo "  --orin-nano         使用 Orin Nano 极限优化配置 (8GB/低内存)"
     echo "  --driver            启动 Livox MID360 驱动 (实时模式需要)"
+    echo "  --dense [VOXEL]     启用 dense_map_mode (全分辨率PCD输出)"
     echo "  --record-bag [PATH] 录制 rosbag (可选指定保存目录)"
     echo "  --config FILE       使用指定的配置文件"
     echo "  --map-path PATH     指定地图保存路径 (默认: sdk/map/)"
@@ -312,6 +346,8 @@ show_help() {
     echo "  $0 --orin-nano --driver --no-rviz --map-path ~/map"
     echo "  $0 --bag /path/to/rosbag --rate 1.5"
     echo "  $0 --driver --record-bag ~/bags --map-path ~/map"
+    echo "  $0 --orin --dense --driver --no-rviz --map-path ~/map"
+    echo "  $0 --orin --dense 0.02 --driver --no-rviz --map-path ~/map"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -321,6 +357,16 @@ while [[ $# -gt 0 ]]; do
         --orin)         USE_ORIN=true; shift ;;
         --orin-nano)    USE_ORIN_NANO=true; shift ;;
         --driver)       USE_DRIVER=true; shift ;;
+        --dense)
+            USE_DENSE=true
+            # 检查下一个参数是否是数字（体素大小）
+            if [[ $# -ge 2 && "$2" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+                DENSE_VOXEL="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
         --record-bag)
             RECORD_BAG=true
             if [[ $# -ge 2 && "$2" != --* ]]; then
@@ -431,6 +477,18 @@ start_slam_node() {
     log_info "启动 Adaptive-LIO 节点..."
     log_info "配置文件: $(basename $CONFIG_FILE)"
     export ADAPTIVE_LIO_CONFIG="$CONFIG_FILE"
+    
+    # dense 模式：通过环境变量启用
+    if [[ "$USE_DENSE" == true ]]; then
+        export ADAPTIVE_LIO_DENSE_MAP=1
+        if [[ -n "$DENSE_VOXEL" ]]; then
+            export ADAPTIVE_LIO_DENSE_VOXEL="$DENSE_VOXEL"
+            log_info "Dense map mode 已启用 (合并时 ${DENSE_VOXEL}m 体素降采样)"
+        else
+            log_info "Dense map mode 已启用 (全分辨率PCD，无降采样)"
+        fi
+    fi
+    
     "$SDK_BIN/adaptive_lio_node" --ros-args --remap __node:=adaptive_lio &
     NODE_PID=$!
     sleep 2
@@ -496,12 +554,24 @@ show_status() {
     [[ "$USE_ORIN_NANO" == true ]] && echo -e "  模式:       ${YELLOW}Orin Nano 极限优化模式${NC}"
     echo -e "  Livox驱动:  $([ "$USE_DRIVER" == true ] && echo "启用" || echo "禁用")"
     echo -e "  RViz2:      $([ "$USE_RVIZ" == true ] && echo "启用" || echo "禁用")"
+    if [[ "$USE_DENSE" == true ]]; then
+        if [[ -n "$DENSE_VOXEL" ]]; then
+            echo -e "  Dense模式:  ${GREEN}启用 (${DENSE_VOXEL}m 体素降采样)${NC}"
+        else
+            echo -e "  Dense模式:  ${GREEN}启用 (全分辨率，无降采样)${NC}"
+        fi
+    else
+        echo -e "  Dense模式:  禁用"
+    fi
     echo -e "  录制rosbag: $([ "$RECORD_BAG" == true ] && echo "启用 (${RECORD_BAG_PATH:-.})" || echo "禁用")"
     echo -e "  地图路径:   ${MAP_PATH}"
     echo -e "  rosbag:     ${BAG_PATH:-"未指定 (等待实时数据)"}"
     [[ -n "$BAG_PATH" ]] && echo -e "  播放速率:   ${BAG_RATE}x"
     echo ""
     echo -e "  ${YELLOW}保存地图:${NC} ros2 service call /save_map std_srvs/srv/Trigger"
+    if [[ "$USE_DENSE" == true ]]; then
+        echo -e "  ${CYAN}(全分辨率点云，无降采样，分段保存，退出时自动流式合并)${NC}"
+    fi
     echo -e "  ${YELLOW}退出:${NC} Ctrl+C"
     echo ""
 }
@@ -693,6 +763,12 @@ source /opt/ros/humble/setup.bash
 
 # 5. 实时建图 + 录包
 ./run.sh --orin --driver --record-bag ~/bags --no-rviz --map-path ~/map
+
+# 6. Dense 模式（全分辨率 PCD）
+./run.sh --orin --dense --driver --no-rviz --map-path ~/map
+
+# 7. Dense 模式 + 2cm 体素降采样
+./run.sh --orin --dense 0.02 --driver --no-rviz --map-path ~/map
 \`\`\`
 
 ## 启动选项
@@ -704,6 +780,7 @@ source /opt/ros/humble/setup.bash
 | \`--orin\` | Orin NX 优化配置 (16GB) |
 | \`--orin-nano\` | Orin Nano 极限优化配置 (8GB) |
 | \`--driver\` | 启动 Livox MID360 驱动 |
+| \`--dense [VOXEL]\` | Dense 模式（可选体素大小，见下文） |
 | \`--record-bag [PATH]\` | 录制 rosbag |
 | \`--config FILE\` | 使用自定义配置文件 |
 | \`--map-path PATH\` | 地图保存路径 (默认: sdk/map/) |
@@ -722,6 +799,61 @@ source /opt/ros/humble/setup.bash
 | size_voxel_map | 0.5 | 0.6 | 0.8 |
 | max_distance | 80m | 60m | 40m |
 | max_num_residuals | 1200 | 800 | 500 |
+
+## Dense Map 模式
+
+### 架构：前端稀疏，输出稠密
+
+本项目采用双分辨率地图架构，将 SLAM 跟踪与地图输出解耦：
+
+\`\`\`
+LiDAR 点云
+    |
+    v
+CT-ICP 配准 (tracking map, 降采样, 快速)
+    |
+    +---> 位姿估计 ---> /odom, /scan
+    |
+    +---> dense_buffer_ (原始点, 无降采样, 后台分段写盘)
+              |
+              v
+         退出时合并 ---> global_map.pcd
+\`\`\`
+
+| 组件 | Tracking Map | Dense Map |
+|------|-------------|-----------|
+| 用途 | ICP 配准匹配 | 最终点云输出 |
+| 体素大小 | 0.5m / 0.25m (多分辨率) | 可配置 (0=不降采样) |
+| 内存占用 | 滑动窗口自动裁剪 | 分段写盘, 峰值 ~32MB |
+| CPU 开销 | CT-ICP 主要开销 | < 0.5ms/帧 (vector push_back) |
+
+### 使用方法
+
+\`\`\`bash
+# 全分辨率，不降采样（适合后期处理）
+./run.sh --dense --bag /path/to/bag --map-path ~/map
+
+# 2cm 体素降采样（适合直接可视化查看）
+./run.sh --dense 0.02 --bag /path/to/bag --map-path ~/map
+
+# 1cm 体素降采样（高精度 + 可直接查看）
+./run.sh --dense 0.01 --bag /path/to/bag --map-path ~/map
+\`\`\`
+
+### 降采样参数选择
+
+| \`--dense\` 参数 | 说明 | 预估文件大小 (30min 数据) |
+|---|---|---|
+| (不带参数) | 原始全量点 | ~3-5GB |
+| \`0.01\` | 1cm 体素 | ~300-500MB |
+| \`0.02\` | 2cm 体素，pcl_viewer 可直接打开 | ~80-150MB |
+
+### 工作原理
+
+1. **运行期间**：每帧点云在 \`cloud_pub_func\` 中以原始分辨率追加到 \`dense_buffer_\`
+2. **分段保存**：buffer 达到 200 万点 (~32MB) 时，后台线程异步写出 \`dense_segment_N.pcd\`
+3. **退出合并**：Ctrl+C 后自动执行流式合并（逐段读取，内存占用 ~1MB），若指定了体素大小则逐段降采样
+4. **SLAM 零影响**：dense 路径不加锁，不影响前端配准速度
 
 ## ROS2 接口
 
@@ -746,6 +878,7 @@ source /opt/ros/humble/setup.bash
 | 帧处理慢 | 使用 \`--orin\` 或 \`--orin-nano\`; 检查 \`free -h\` swap 使用 |
 | 地图未保存 | Ctrl+C 后等待"清理完成"提示 (最多120秒)，不要多次 Ctrl+C |
 | Livox 驱动问题 | 设置 \`LIVOX_WS_PATH\` 或确保 \`~/livox_ws\` 存在 |
+| Dense 模式文件过大 | 使用 \`--dense 0.02\` 进行 2cm 体素降采样 |
 READMEEOF
 
 # ==================== 汇总 ====================
