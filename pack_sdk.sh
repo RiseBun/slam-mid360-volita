@@ -147,7 +147,7 @@ if [[ ! -d "$CONFIG_DIR" ]]; then
     exit 1
 fi
 
-REQUIRED_CONFIGS=("mapping_m.yaml" "mapping_orin_nx.yaml" "mapping_orin_nano.yaml" "adaptive_lio.rviz")
+REQUIRED_CONFIGS=("mapping_m.yaml" "mapping_high_altitude.yaml" "mapping_orin_nx.yaml" "mapping_orin_nano.yaml" "adaptive_lio.rviz")
 for cfg in "${REQUIRED_CONFIGS[@]}"; do
     if [[ ! -f "$CONFIG_DIR/$cfg" ]]; then
         log_error "缺少配置文件: $CONFIG_DIR/$cfg"
@@ -294,6 +294,7 @@ BAG_PATH=""
 BAG_RATE="1.0"
 USE_ORIN=false
 USE_ORIN_NANO=false
+CONFIG_PROFILE="indoor"
 USE_DRIVER=false
 USE_DENSE=false
 DENSE_VOXEL=""
@@ -303,6 +304,7 @@ CUSTOM_CONFIG=""
 CONFIG_BACKUP=""
 
 CONFIG_FILE="$SDK_CONFIG/mapping_m.yaml"
+CONFIG_OUTDOOR="$SDK_CONFIG/mapping_high_altitude.yaml"
 CONFIG_ORIN="$SDK_CONFIG/mapping_orin_nx.yaml"
 CONFIG_ORIN_NANO="$SDK_CONFIG/mapping_orin_nano.yaml"
 
@@ -354,8 +356,11 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --rviz)         USE_RVIZ=true; shift ;;
         --no-rviz)      USE_RVIZ=false; shift ;;
-        --orin)         USE_ORIN=true; shift ;;
-        --orin-nano)    USE_ORIN_NANO=true; shift ;;
+        --indoor)       CONFIG_PROFILE="indoor"; USE_ORIN=false; USE_ORIN_NANO=false; shift ;;
+        --outdoor|--high-altitude)
+                        CONFIG_PROFILE="outdoor"; USE_ORIN=false; USE_ORIN_NANO=false; shift ;;
+        --orin)         USE_ORIN=true; USE_ORIN_NANO=false; CONFIG_PROFILE="orin"; shift ;;
+        --orin-nano)    USE_ORIN=false; USE_ORIN_NANO=true; CONFIG_PROFILE="orin-nano"; shift ;;
         --driver)       USE_DRIVER=true; shift ;;
         --dense)
             USE_DENSE=true
@@ -388,6 +393,10 @@ if [[ -n "$CUSTOM_CONFIG" ]]; then
     [[ ! -f "$CUSTOM_CONFIG" ]] && { log_error "配置文件不存在: $CUSTOM_CONFIG"; exit 1; }
     CONFIG_FILE="$CUSTOM_CONFIG"
     log_info "使用自定义配置: $CONFIG_FILE"
+elif [[ "$CONFIG_PROFILE" == "outdoor" ]]; then
+    [[ ! -f "$CONFIG_OUTDOOR" ]] && { log_error "high altitude config not found: $CONFIG_OUTDOOR"; exit 1; }
+    CONFIG_FILE="$CONFIG_OUTDOOR"
+    log_info "using high altitude config: $CONFIG_FILE"
 elif [[ "$USE_ORIN_NANO" == true ]]; then
     [[ ! -f "$CONFIG_ORIN_NANO" ]] && { log_error "配置不存在: $CONFIG_ORIN_NANO"; exit 1; }
     CONFIG_FILE="$CONFIG_ORIN_NANO"
@@ -899,7 +908,7 @@ echo -e "  文件数量:  $FILE_COUNT"
 echo -e "  总大小:    $TOTAL_SIZE"
 echo ""
 echo -e "  ${GREEN}bin/${NC}      adaptive_lio_node ($(du -sh "$OUTPUT_DIR/bin/adaptive_lio_node" | cut -f1))"
-echo -e "  ${GREEN}config/${NC}   mapping_m.yaml, mapping_orin_nx.yaml, mapping_orin_nano.yaml"
+echo -e "  ${GREEN}config/${NC}   mapping_m.yaml, mapping_high_altitude.yaml, mapping_orin_nx.yaml, mapping_orin_nano.yaml"
 echo -e "  ${GREEN}lib/${NC}      livox_ros_driver2 库 ($LIVOX_SO_COUNT 个 .so)"
 echo -e "  ${GREEN}scripts/${NC}  gui_launcher.py, run_slam.sh, etc."
 echo ""

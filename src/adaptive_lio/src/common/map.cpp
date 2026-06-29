@@ -1,5 +1,8 @@
 #include "map.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 void MultipleResolutionVoxelMap::InsertPoint(const point3D &point)
 {
      for (auto map_idx(0); map_idx < options_.resolutions.size(); map_idx++)
@@ -101,7 +104,7 @@ SearchParams MultipleResolutionVoxelMap::SearchParamsFromRadiusSearch(double r) 
      params.map_id = idx;
      double resolution = options_.resolutions[idx].resolution;
      params.voxel_resolution = resolution;
-     params.voxel_neighborhood = 1; // std::ceil(radius / resolution);
+     params.voxel_neighborhood = std::max(1, static_cast<int>(std::ceil(radius / resolution)));
 
      // std::cout << "map_id: " << params.map_id
      //           << ", radius: " << radius
@@ -124,7 +127,7 @@ SearchParams MultipleResolutionVoxelMap::SearchParamsFromRadius(double radius) c
 
      params.radius = radius;
      params.voxel_resolution = options_.resolutions[params.map_id].resolution;
-     params.voxel_neighborhood = 1;
+     params.voxel_neighborhood = std::max(1, static_cast<int>(std::ceil(radius / params.voxel_resolution)));
 
      return params;
 }

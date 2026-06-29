@@ -48,16 +48,29 @@ class AdaptiveLioLauncher:
         livox_ws_env = os.environ.get('LIVOX_WS_PATH', '')
         self.livox_ws_path = Path(livox_ws_env) if livox_ws_env else Path.home() / "livox_ws"
         self.ros2_setup = "/opt/ros/humble/setup.bash"
-        self.config_path = self.ws_path / "config" / "mapping_m.yaml"
+        self.default_profile_key = "室内"
+        self.profile_configs = {
+            "室内": self.ws_path / "config" / "mapping_m.yaml",
+            "室外": self.ws_path / "config" / "mapping_high_altitude.yaml",
+            "Orin NX": self.ws_path / "config" / "mapping_orin_nx.yaml",
+        }
+        self.profile_var = tk.StringVar(value=self.default_profile_key)
+
+        env_config = os.environ.get('ADAPTIVE_LIO_CONFIG', '')
+        if env_config:
+            try:
+                env_path = Path(env_config).resolve()
+                for profile_name, profile_path in self.profile_configs.items():
+                    if profile_path.resolve() == env_path:
+                        self.profile_var.set(profile_name)
+                        break
+            except Exception:
+                pass
 
         # 状态变量
         self.is_recording = False
         self.is_playing = False
         self.frame_count = 0
-
-        # Orin 优化模式
-        self.orin_mode_var = tk.BooleanVar(value=False)
-        self.orin_config_path = self.ws_path / "config" / "mapping_orin_nx.yaml"
 
         # 资源监控数据缓冲
         self.monitor_data = {
@@ -77,6 +90,13 @@ class AdaptiveLioLauncher:
         # 启动时检查环境
         self.root.after(500, self.check_environment)
         self.root.after(1500, self.update_resource_graph)
+
+    @property
+    def config_path(self):
+        return self.profile_configs.get(
+            self.profile_var.get(),
+            self.profile_configs[self.default_profile_key],
+        )
 
     def create_widgets(self):
         """创建所有界面组件"""
@@ -151,13 +171,25 @@ class AdaptiveLioLauncher:
         self.btn_rviz = ttk.Button(btn_row2, text="启动RViz2", command=self.start_rviz, width=10)
         self.btn_rviz.pack(side=tk.LEFT, padx=3)
 
-        # Orin NX 优化模式选项
-        orin_row = ttk.Frame(ctrl_frame)
-        orin_row.pack(fill=tk.X, pady=3)
-        ttk.Checkbutton(orin_row, text="Orin NX 优化模式",
-                        variable=self.orin_mode_var).pack(side=tk.LEFT, padx=3)
-        ttk.Label(orin_row, text="(16GB边缘平台优化)",
-                  foreground='gray', font=('', 8)).pack(side=tk.LEFT)
+        profile_row = ttk.Frame(ctrl_frame)
+        profile_row.pack(fill=tk.X, pady=3)
+        ttk.Label(profile_row, text="配置档位").pack(side=tk.LEFT, padx=3)
+        self.profile_combo = ttk.Combobox(
+            profile_row,
+            textvariable=self.profile_var,
+            values=list(self.profile_configs.keys()),
+            state="readonly",
+            width=10,
+        )
+        self.profile_combo.pack(side=tk.LEFT, padx=3)
+        self.profile_combo.bind("<<ComboboxSelected>>", self.on_profile_changed)
+        self.config_path_label = ttk.Label(
+            profile_row,
+            text=self.config_path.name,
+            foreground='gray',
+            font=('', 8),
+        )
+        self.config_path_label.pack(side=tk.LEFT, padx=8)
 
         # 节点状态指示
         status_row = ttk.Frame(ctrl_frame)
@@ -390,8 +422,8 @@ class AdaptiveLioLauncher:
         btn_frame.pack(fill=tk.X, pady=10)
 
         ttk.Button(btn_frame, text="应用参数", command=self.apply_params, width=12).pack(side=tk.LEFT, padx=10)
-        ttk.Button(btn_frame, text="恢复默认", command=self.reset_params, width=12).pack(side=tk.LEFT, padx=10)
-        ttk.Button(btn_frame, text="从文件重载", command=self.reload_params_from_file, width=12).pack(side=tk.LEFT, padx=10)
+        ttk.Button(btn_frame, text="恢复当前配置", command=self.reset_params, width=12).pack(side=tk.LEFT, padx=10)
+        ttk.Button(btn_frame, text="打开配置", command=self.open_config_file, width=12).pack(side=tk.LEFT, padx=10)
 
         self.param_status = ttk.Label(btn_frame, text="", foreground='green')
         self.param_status.pack(side=tk.LEFT, padx=20)
@@ -436,6 +468,13 @@ class AdaptiveLioLauncher:
         if ws_install.exists():
             cmd += f"source {ws_install} && "
         return cmd
+
+    def on_profile_changed(self, event=None):
+        """切换配置档位时，同步参数面板与路径显示"""
+        if hasattr(self, "config_path_label"):
+            self.config_path_label.config(text=self.config_path.name)
+        self.reload_config_display()
+        self.log(f"已切换配置档位: {self.profile_var.get()} -> {self.config_path}", "INFO")
 
     def check_environment(self):
         """检查环境依赖"""
@@ -521,12 +560,11 @@ class AdaptiveLioLauncher:
 
         try:
             env = os.environ.copy()
-            if self.orin_mode_var.get():
-                if not self.orin_config_path.exists():
-                    messagebox.showerror("错误", f"Orin配置文件不存在:\n{self.orin_config_path}")
-                    return
-                env['ADAPTIVE_LIO_CONFIG'] = str(self.orin_config_path)
-                self.log(f"Orin NX 优化模式: {self.orin_config_path}")
+            if not self.config_path.exists():
+                messagebox.showerror("错误", f"配置文件不存在:\n{self.config_path}")
+                return
+            env['ADAPTIVE_LIO_CONFIG'] = str(self.config_path)
+            self.log(f"使用配置档位: {self.profile_var.get()} -> {self.config_path}")
             self.processes['adaptive_lio'] = subprocess.Popen(
                 cmd, shell=True, executable='/bin/bash',
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -770,6 +808,9 @@ class AdaptiveLioLauncher:
     def apply_params(self):
         """应用所有参数到配置文件"""
         try:
+            if not self.config_path.exists():
+                messagebox.showerror("错误", f"配置文件不存在:\n{self.config_path}")
+                return
             with open(self.config_path, 'r') as f:
                 content = f.read()
 
@@ -801,39 +842,12 @@ class AdaptiveLioLauncher:
             messagebox.showerror("错误", f"保存失败: {e}")
 
     def reset_params(self):
-        """恢复默认参数"""
-        defaults_cticp = {
-            'icpmodel': 'CT_POINT_TO_PLANE',
-            'max_num_iteration': '10',
-            'max_dist_to_plane': '0.3',
-            'sampling_rate': '1.5',
-            'motion_comp': 'CONSTANT_VELOCITY',
-            'init_num_frames': '20',
-        }
-        defaults_beta = {
-            'beta_loc': '0.001',
-            'beta_orient': '0.1',
-            'beta_cv': '0.001',
-            'beta_sv': '0.01',
-        }
-        defaults_voxel = {
-            'size_voxel': '0.5',
-            'max_distance': '500.0',
-            'weight_alpha': '0.9',
-            'weight_neig': '0.1',
-            'power_plan': '2.0',
-            'max_neighbors': '20',
-        }
-        for key, value in defaults_cticp.items():
-            if key in self.cticp_param_vars:
-                self.cticp_param_vars[key][0].set(value)
-        for key, value in defaults_beta.items():
-            if key in self.beta_param_vars:
-                self.beta_param_vars[key][0].set(value)
-        for key, value in defaults_voxel.items():
-            if key in self.voxel_param_vars:
-                self.voxel_param_vars[key][0].set(value)
-        self.param_status.config(text="已恢复默认", foreground='blue')
+        """恢复当前配置档位的参数"""
+        if not self.config_path.exists():
+            messagebox.showwarning("警告", f"配置文件不存在:\n{self.config_path}")
+            return
+        self.reload_params_from_file()
+        self.param_status.config(text="已恢复当前配置", foreground='blue')
 
     def reload_params_from_file(self):
         """从配置文件重新加载参数"""

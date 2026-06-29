@@ -4,6 +4,7 @@
 #include <fstream>
 #include <unistd.h>
 #include <iomanip>
+#include <algorithm>
 
 namespace zjloc
 {
@@ -816,10 +817,15 @@ namespace zjloc
           size_t num = keypoints.size();
           int num_residuals = 0;
 
+          int dbg_skip_neighbor = 0;
+          int dbg_skip_plane = 0;
+          double dbg_sum_kp_dist = 0.0;
+
           for (int k = 0; k < num; k++)
           {
                auto &keypoint = keypoints[k];
                auto &raw_point = keypoint.raw_point;
+               dbg_sum_kp_dist += raw_point.norm();
 
                NeighborPoints vector_neighbors;
                mmap->RadiusSearchInPlace(keypoint.point, vector_neighbors, raw_point.norm(),
@@ -837,7 +843,10 @@ namespace zjloc
                //                                             : &voxels);
 
                if (vector_neighbors.size() < options_.min_number_neighbors)
+               {
+                    dbg_skip_neighbor++;
                     continue;
+               }
 
                double weight;
 
@@ -852,6 +861,7 @@ namespace zjloc
                                                               (kMaxPointToPlane *
                                                                options_.min_number_neighbors));
 
+               int dbg_residuals_before = num_residuals;
                double point_to_plane_dist;
                for (int i(0); i < options_.num_closest_neighbors; ++i)
                {
@@ -900,8 +910,39 @@ namespace zjloc
                     }
                }
 
+               if (num_residuals == dbg_residuals_before)
+                    dbg_skip_plane++;
+
                if (num_residuals >= options_.max_num_residuals)
                     break;
+          }
+
+          static int dbg_call_count = 0;
+          static long dbg_sum_keypts = 0;
+          static long dbg_sum_residuals = 0;
+          static long dbg_sum_skip_neighbor = 0;
+          static long dbg_sum_skip_plane = 0;
+          static double dbg_sum_avg_kp_dist = 0.0;
+          dbg_call_count++;
+          dbg_sum_keypts += (long)num;
+          dbg_sum_residuals += num_residuals;
+          dbg_sum_skip_neighbor += dbg_skip_neighbor;
+          dbg_sum_skip_plane += dbg_skip_plane;
+          dbg_sum_avg_kp_dist += (num > 0 ? dbg_sum_kp_dist / (double)num : 0.0);
+          if (dbg_call_count >= 50)
+          {
+               std::cout << "[SURF/50call] avg_keypts=" << (dbg_sum_keypts / dbg_call_count)
+                         << " residuals=" << (dbg_sum_residuals / dbg_call_count)
+                         << " skip_neighbor=" << (dbg_sum_skip_neighbor / dbg_call_count)
+                         << " skip_plane=" << (dbg_sum_skip_plane / dbg_call_count)
+                         << " avg_kp_dist=" << (dbg_sum_avg_kp_dist / dbg_call_count) << "m"
+                         << std::endl;
+               dbg_call_count = 0;
+               dbg_sum_keypts = 0;
+               dbg_sum_residuals = 0;
+               dbg_sum_skip_neighbor = 0;
+               dbg_sum_skip_plane = 0;
+               dbg_sum_avg_kp_dist = 0.0;
           }
      }
 
@@ -941,10 +982,15 @@ namespace zjloc
           size_t num = keypoints.size();
           int num_residuals = 0;
 
+          int dbg_skip_neighbor = 0;
+          int dbg_skip_plane = 0;
+          double dbg_sum_kp_dist = 0.0;
+
           for (int k = 0; k < num; k++)
           {
                auto &keypoint = keypoints[k];
                auto &raw_point = keypoint.raw_point;
+               dbg_sum_kp_dist += raw_point.norm();
 
                // Sliding window: near-field points search in fine-grained voxel_map_near first
                std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> vector_neighbors;
@@ -959,10 +1005,12 @@ namespace zjloc
                                                             options_.near_size_voxel_map,
                                                             options_.max_number_neighbors,
                                                             kThresholdCapacity,
-                                                            nullptr);
-                         used_near_map = true;
-                    }
-               }
+                                                            nullptr,
+                                                            options_.min_number_neighbors,
+                                                            1);
+                          used_near_map = true;
+                     }
+                }
 
                // Fallback to standard voxel_map if near map didn't find enough neighbors
                if (!used_near_map || (int)vector_neighbors.size() < options_.min_number_neighbors)
@@ -972,11 +1020,16 @@ namespace zjloc
                                                        options_.size_voxel_map,
                                                        options_.max_number_neighbors,
                                                        kThresholdCapacity,
-                                                       nullptr);
-               }
+                                                       nullptr,
+                                                       options_.min_number_neighbors,
+                                                       1);
+                }
 
                if (vector_neighbors.size() < options_.min_number_neighbors)
+               {
+                    dbg_skip_neighbor++;
                     continue;
+               }
 
                double weight;
 
@@ -991,6 +1044,7 @@ namespace zjloc
                                                               (kMaxPointToPlane *
                                                                options_.min_number_neighbors));
 
+               int dbg_residuals_before = num_residuals;
                double point_to_plane_dist;
                for (int i(0); i < options_.num_closest_neighbors; ++i)
                {
@@ -1039,8 +1093,39 @@ namespace zjloc
                     }
                }
 
+               if (num_residuals == dbg_residuals_before)
+                    dbg_skip_plane++;
+
                if (num_residuals >= options_.max_num_residuals)
                     break;
+          }
+
+          static int dbg_call_count = 0;
+          static long dbg_sum_keypts = 0;
+          static long dbg_sum_residuals = 0;
+          static long dbg_sum_skip_neighbor = 0;
+          static long dbg_sum_skip_plane = 0;
+          static double dbg_sum_avg_kp_dist = 0.0;
+          dbg_call_count++;
+          dbg_sum_keypts += (long)num;
+          dbg_sum_residuals += num_residuals;
+          dbg_sum_skip_neighbor += dbg_skip_neighbor;
+          dbg_sum_skip_plane += dbg_skip_plane;
+          dbg_sum_avg_kp_dist += (num > 0 ? dbg_sum_kp_dist / (double)num : 0.0);
+          if (dbg_call_count >= 50)
+          {
+               std::cout << "[SURF/50call] avg_keypts=" << (dbg_sum_keypts / dbg_call_count)
+                         << " residuals=" << (dbg_sum_residuals / dbg_call_count)
+                         << " skip_neighbor=" << (dbg_sum_skip_neighbor / dbg_call_count)
+                         << " skip_plane=" << (dbg_sum_skip_plane / dbg_call_count)
+                         << " avg_kp_dist=" << (dbg_sum_avg_kp_dist / dbg_call_count) << "m"
+                         << std::endl;
+               dbg_call_count = 0;
+               dbg_sum_keypts = 0;
+               dbg_sum_residuals = 0;
+               dbg_sum_skip_neighbor = 0;
+               dbg_sum_skip_plane = 0;
+               dbg_sum_avg_kp_dist = 0.0;
           }
      }
 
@@ -1061,56 +1146,72 @@ namespace zjloc
      lidarodom_m::searchNeighbors(const voxelHashMap &map, const Eigen::Vector3d &point,
                                   int nb_voxels_visited, double size_voxel_map,
                                   int max_num_neighbors, int threshold_voxel_capacity,
-                                  std::vector<voxel> *voxels)
+                                  std::vector<voxel> *voxels, int min_neighbors,
+                                  int max_extra_voxel_neighborhood)
      {
 
           if (voxels != nullptr)
                voxels->reserve(max_num_neighbors);
 
-          short kx = static_cast<short>(point[0] / size_voxel_map);
-          short ky = static_cast<short>(point[1] / size_voxel_map);
-          short kz = static_cast<short>(point[2] / size_voxel_map);
+          const short kx = static_cast<short>(point[0] / size_voxel_map);
+          const short ky = static_cast<short>(point[1] / size_voxel_map);
+          const short kz = static_cast<short>(point[2] / size_voxel_map);
+          const int max_search_nb = nb_voxels_visited + std::max(0, max_extra_voxel_neighborhood);
+          const int target_neighbors = (min_neighbors > 0) ? std::min(min_neighbors, max_num_neighbors) : -1;
 
-          priority_queue_t priority_queue;
-
-          voxel voxel_temp(kx, ky, kz);
-          for (short kxx = kx - nb_voxels_visited; kxx < kx + nb_voxels_visited + 1; ++kxx)
+          auto collect_neighbors = [&](int search_nb, priority_queue_t &priority_queue)
           {
-               for (short kyy = ky - nb_voxels_visited; kyy < ky + nb_voxels_visited + 1; ++kyy)
+               voxel voxel_temp(kx, ky, kz);
+               for (short kxx = kx - search_nb; kxx < kx + search_nb + 1; ++kxx)
                {
-                    for (short kzz = kz - nb_voxels_visited; kzz < kz + nb_voxels_visited + 1; ++kzz)
+                    for (short kyy = ky - search_nb; kyy < ky + search_nb + 1; ++kyy)
                     {
-                         voxel_temp.x = kxx;
-                         voxel_temp.y = kyy;
-                         voxel_temp.z = kzz;
-
-                         auto search = map.find(voxel_temp);
-                         if (search != map.end())
+                         for (short kzz = kz - search_nb; kzz < kz + search_nb + 1; ++kzz)
                          {
-                              const auto &voxel_block = search.value();
-                              if (voxel_block.NumPoints() < threshold_voxel_capacity)
-                                   continue;
-                              for (int i(0); i < voxel_block.NumPoints(); ++i)
+                              voxel_temp.x = kxx;
+                              voxel_temp.y = kyy;
+                              voxel_temp.z = kzz;
+
+                              auto search = map.find(voxel_temp);
+                              if (search != map.end())
                               {
-                                   auto &neighbor = voxel_block.points[i];
-                                   double distance = (neighbor - point).norm();
-                                   if (priority_queue.size() == max_num_neighbors)
+                                   const auto &voxel_block = search.value();
+                                   if (voxel_block.NumPoints() < threshold_voxel_capacity)
+                                        continue;
+                                   for (int i(0); i < voxel_block.NumPoints(); ++i)
                                    {
-                                        if (distance < std::get<0>(priority_queue.top()))
+                                        auto &neighbor = voxel_block.points[i];
+                                        double distance = (neighbor - point).norm();
+                                        if (priority_queue.size() == static_cast<size_t>(max_num_neighbors))
                                         {
-                                             priority_queue.pop();
+                                             if (distance < std::get<0>(priority_queue.top()))
+                                             {
+                                                  priority_queue.pop();
+                                                  priority_queue.emplace(distance, neighbor, voxel_temp);
+                                             }
+                                        }
+                                        else
+                                        {
                                              priority_queue.emplace(distance, neighbor, voxel_temp);
                                         }
                                    }
-                                   else
-                                        priority_queue.emplace(distance, neighbor, voxel_temp);
                               }
                          }
                     }
                }
+          };
+
+          priority_queue_t priority_queue;
+          for (int search_nb = nb_voxels_visited; search_nb <= max_search_nb; ++search_nb)
+          {
+               priority_queue_t local_queue;
+               collect_neighbors(search_nb, local_queue);
+               priority_queue.swap(local_queue);
+               if (target_neighbors <= 0 || static_cast<int>(priority_queue.size()) >= target_neighbors)
+                    break;
           }
 
-          auto size = priority_queue.size();
+          const auto size = priority_queue.size();
           std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> closest_neighbors(size);
           if (voxels != nullptr)
           {

@@ -164,7 +164,8 @@ namespace zjloc
           std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
           searchNeighbors(const voxelHashMap &map, const Eigen::Vector3d &point,
                           int nb_voxels_visited, double size_voxel_map, int max_num_neighbors,
-                          int threshold_voxel_capacity = 1, std::vector<voxel> *voxels = nullptr);
+                          int threshold_voxel_capacity = 1, std::vector<voxel> *voxels = nullptr,
+                          int min_neighbors = -1, int max_extra_voxel_neighborhood = 2);
 
           inline Sophus::SO3d r2SO3(const Eigen::Vector3d r)
           {

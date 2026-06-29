@@ -1,0 +1,104 @@
+%YAML 1.2
+---
+# Adaptive-LIO 高空建图专用配置
+# 适用场景：高空环境，雷达有效探测距离约 80m（MID-360 标称范围）
+# 设计原则：精度优先于近场，远场保连续性；计算量控制在 10Hz 实时
+
+preprocess:
+  point_filter_num: 1
+  lidar_type: 1                # 1-AVIA/MID360
+  blind: 0.5                   # 高空近场无效，过滤近距噪点
+  sweep_cut_num: 1
+  degenerate_window_num: 10
+
+common:
+  imu_topic: /livox/imu
+  lid_topic: /livox/lidar
+  gnorm: 1
+  map_save_path: ""
+  map_voxel_size: 0.08         # 高空范围大，降采样稍粗
+
+  enable_save_sliding_window: true
+  save_near_range: 30.0        # 约 max_distance 的 35-40%
+  archive_trigger_distance: 12.0
+  max_near_buffer_points: 5000000
+
+  dense_map_mode: false
+  dense_save_segment_points: 2000000
+  dense_voxel_size: 0.0
+
+mapping:
+  extrinsic_est_en: true
+  extrinsic_T: [0, 0, 0]
+  extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+map_options:
+  map_type: MULTI_RESOLUTION_VOXEL_HASHMAP
+  resolutions:
+    # 三层分辨率：近场细 / 中场常规 / 远场粗（覆盖 80m 范围）
+    - resolution: 0.3
+      max_num_points: 25
+      min_distance_between_points: 0.08
+    - resolution: 0.7
+      max_num_points: 30
+      min_distance_between_points: 0.18
+    - resolution: 1.8
+      max_num_points: 45
+      min_distance_between_points: 0.3
+  neig_options:
+    distance_max: 80           # 匹配雷达 80m 探测距离
+    radius_min: 0.2
+    radius_max: 2.5            # 80m 处的搜索半径（高空点稀疏需要更大半径）
+    exponent: 0.8              # 中距离（30-50m）半径快速增长
+
+delay_time: 0.2
+
+odometry:
+  surf_res: 0.7                # 关键点采样间距（适配点云稀疏度）
+  log_print: false
+  max_num_iteration: 10        # 保持默认，控制计算量
+
+  icpmodel: CT_POINT_TO_PLANE
+  size_voxel_map: 0.7
+  min_distance_points: 0.2
+  max_num_points_in_voxel: 25
+  max_distance: 80.0           # FOV 清理范围 = 雷达探测范围
+  weight_alpha: 0.9
+  weight_neighborhood: 0.1
+  max_dist_to_plane_icp: 0.4   # 0.3 → 0.4：高空远点平面拟合误差略大
+  init_num_frames: 20
+  voxel_neighborhood: 1        # 保持 1（=2 会让搜索量×4.6，引发队列饥饿）
+  max_number_neighbors: 35     # 高空点稀疏，放宽邻域候选上限
+  threshold_voxel_occupancy: 1
+  estimate_normal_from_neighborhood: true
+  min_number_neighbors: 10     # 高空远场约束更稀疏，先保住可用残差
+  power_planarity: 1.5         # 稍微降低平面性门槛
+  num_closest_neighbors: 1
+
+  sampling_rate: 1.5
+  max_num_residuals: 1200      # 保持默认（之前 1500 会引发队列饥饿）
+  min_num_residuals: 50
+  motion_compensation: CONSTANT_VELOCITY
+
+  beta_location_consistency: 0.001
+  beta_orientation_consistency: 0.05    # 高空弱几何时，别把姿态一致性压得太死
+  beta_constant_velocity: 0.001
+  beta_small_velocity: 0.01
+
+  thres_translation_norm: 0.01
+  thres_orientation_norm: 0.1
+
+  satu_acc: 19.5
+  satu_gyro: 16
+
+  ceres_iterations: 5          # 保持默认
+  ceres_threads: 3
+
+  enable_mmap: false
+
+  # 滑动窗口：近场 30m 精细配准（高空主要靠近场提供约束）
+  enable_sliding_window: true
+  near_range: 40.0             # 高空把可用局部结构尽量保留下来
+  near_size_voxel_map: 0.25
+  near_min_distance_points: 0.06
+  near_max_num_points_in_voxel: 40

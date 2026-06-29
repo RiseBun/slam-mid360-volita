@@ -20,6 +20,8 @@ BAG_PATH=""
 BAG_RATE="1.0"
 BAG_LOOP=""
 NO_RVIZ=false
+CONFIG_FILE="$PKG_DIR/config/mapping_m.yaml"
+CONFIG_OUTDOOR="$PKG_DIR/config/mapping_high_altitude.yaml"
 
 # 解析参数
 while [[ $# -gt 0 ]]; do
@@ -44,6 +46,18 @@ while [[ $# -gt 0 ]]; do
             NO_RVIZ=true
             shift
             ;;
+        --indoor)
+            CONFIG_FILE="$PKG_DIR/config/mapping_m.yaml"
+            shift
+            ;;
+        --outdoor|--high-altitude)
+            CONFIG_FILE="$CONFIG_OUTDOOR"
+            shift
+            ;;
+        --config)
+            CONFIG_FILE="$2"
+            shift 2
+            ;;
         --help|-h)
             echo "Adaptive-LIO ROS2 启动脚本"
             echo ""
@@ -55,6 +69,10 @@ while [[ $# -gt 0 ]]; do
             echo "  --rate, -r <rate>     播放速率 (默认: 1.0)"
             echo "  --loop                循环播放"
             echo "  --no-rviz             不启动RViz2"
+            echo "  --indoor              使用室内默认配置"
+            echo "  --outdoor             使用高空建图配置"
+            echo "  --high-altitude       同 --outdoor"
+            echo "  --config <file>       使用自定义配置文件"
             echo "  --help, -h            显示帮助"
             echo ""
             echo "示例:"
@@ -80,6 +98,12 @@ done
 echo "========================================="
 echo "  Adaptive-LIO ROS2 启动"
 echo "========================================="
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[ERROR] 配置文件不存在: $CONFIG_FILE"
+    exit 1
+fi
+echo "[INFO] 使用配置: $CONFIG_FILE"
 
 source /opt/ros/humble/setup.bash
 
@@ -153,6 +177,7 @@ trap cleanup EXIT INT TERM
 
 # 启动 Adaptive-LIO 节点
 echo "[INFO] 启动 Adaptive-LIO 节点..."
+export ADAPTIVE_LIO_CONFIG="$CONFIG_FILE"
 ros2 run adaptive_lio adaptive_lio_node &
 NODE_PID=$!
 sleep 2

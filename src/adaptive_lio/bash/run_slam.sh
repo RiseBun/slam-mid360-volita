@@ -46,6 +46,7 @@ BAG_PATH=""
 BAG_RATE="1.0"
 USE_ORIN=false
 USE_ORIN_NANO=false
+CONFIG_PROFILE="indoor"
 USE_DRIVER=false
 USE_DENSE=false
 DENSE_VOXEL=""
@@ -55,6 +56,7 @@ CUSTOM_CONFIG=""
 
 # 配置文件路径
 CONFIG_FILE="$PKG_DIR/config/mapping_m.yaml"
+CONFIG_OUTDOOR="$PKG_DIR/config/mapping_high_altitude.yaml"
 CONFIG_ORIN="$PKG_DIR/config/mapping_orin_nx.yaml"
 CONFIG_ORIN_NANO="$PKG_DIR/config/mapping_orin_nano.yaml"
 CONFIG_BACKUP=""
@@ -117,12 +119,28 @@ while [[ $# -gt 0 ]]; do
             USE_RVIZ=false
             shift
             ;;
+        --indoor)
+            CONFIG_PROFILE="indoor"
+            USE_ORIN=false
+            USE_ORIN_NANO=false
+            shift
+            ;;
+        --outdoor|--high-altitude)
+            CONFIG_PROFILE="outdoor"
+            USE_ORIN=false
+            USE_ORIN_NANO=false
+            shift
+            ;;
         --orin)
             USE_ORIN=true
+            USE_ORIN_NANO=false
+            CONFIG_PROFILE="orin"
             shift
             ;;
         --orin-nano)
+            USE_ORIN=false
             USE_ORIN_NANO=true
+            CONFIG_PROFILE="orin-nano"
             shift
             ;;
         --driver)
@@ -185,6 +203,13 @@ if [[ -n "$CUSTOM_CONFIG" ]]; then
     fi
     CONFIG_FILE="$CUSTOM_CONFIG"
     log_info "使用自定义配置: $CONFIG_FILE"
+elif [[ "$CONFIG_PROFILE" == "outdoor" ]]; then
+    if [[ ! -f "$CONFIG_OUTDOOR" ]]; then
+        log_error "高空配置文件不存在: $CONFIG_OUTDOOR"
+        exit 1
+    fi
+    CONFIG_FILE="$CONFIG_OUTDOOR"
+    log_info "使用高空建图配置: $CONFIG_FILE"
 elif [[ "$USE_ORIN_NANO" == true ]]; then
     if [[ ! -f "$CONFIG_ORIN_NANO" ]]; then
         log_error "Orin Nano 配置文件不存在: $CONFIG_ORIN_NANO"
@@ -442,8 +467,12 @@ show_status() {
     echo -e "${CYAN}========================================${NC}"
     echo ""
     echo -e "  配置文件:   $(basename $CONFIG_FILE)"
-    [[ "$USE_ORIN" == true ]] && echo -e "  模式:       ${YELLOW}Orin NX 优化模式${NC}"
-    [[ "$USE_ORIN_NANO" == true ]] && echo -e "  模式:       ${YELLOW}Orin Nano 极限优化模式${NC}"
+    case "$CONFIG_PROFILE" in
+        outdoor) echo -e "  模式:       ${YELLOW}高空建图模式${NC}" ;;
+        orin) echo -e "  模式:       ${YELLOW}Orin NX 优化模式${NC}" ;;
+        orin-nano) echo -e "  模式:       ${YELLOW}Orin Nano 极限优化模式${NC}" ;;
+        *) echo -e "  模式:       室内默认模式" ;;
+    esac
     echo -e "  Livox驱动:  $([ "$USE_DRIVER" == true ] && echo "启用" || echo "禁用")"
     echo -e "  RViz2:      $([ "$USE_RVIZ" == true ] && echo "启用" || echo "禁用")"
     if [[ "$USE_DENSE" == true ]]; then
