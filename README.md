@@ -16,6 +16,7 @@
 - **多分辨率体素地图**：3 层分辨率 (0.2m/0.5m/1.2m)，平衡精度与效率
 - **双分辨率地图架构**：前端 tracking map 保持轻量快速，输出 dense map 保留全分辨率
 - **内存管理**：分段保存 + voxel map 大小限制，支持长时间大范围建图
+- **室内 / 室外配置档位**：内置 `--indoor` 与 `--outdoor`，室外高空模式面向 70-80m 远场观测优化
 - **边缘设备优化**：内置 Orin NX / Orin Nano 专用配置，支持资源受限平台
 - **GUI 控制面板**：可视化参数调节、一键启停、实时状态监控
 
@@ -27,6 +28,7 @@
 - [依赖安装](#依赖安装)
 - [编译安装](#编译安装)
 - [快速开始](#快速开始)
+- [配置模式](#配置模式)
 - [Dense Map 模式](#dense-map-模式)
 - [边缘设备部署](#边缘设备部署)
 - [传感器配置](#传感器配置)
@@ -153,6 +155,12 @@ cd ~/slam-mid360-volita/src/adaptive_lio/bash
 # 指定地图保存路径
 ./run_slam.sh --map-path /tmp/my_map/
 
+# 室内默认模式
+./run_slam.sh --indoor --driver --no-rviz --map-path ~/map
+
+# 室外/高空模式，面向 70-80m 远场观测
+./run_slam.sh --outdoor --driver --no-rviz --map-path ~/map
+
 # Orin NX 优化模式
 ./run_slam.sh --orin --no-rviz --bag /path/to/rosbag
 
@@ -175,6 +183,8 @@ cd ~/slam-mid360-volita/src/adaptive_lio/bash
 |------|------|
 | `--rviz` | 启动 RViz2 可视化（默认） |
 | `--no-rviz` | 不启动 RViz2 |
+| `--indoor` | 使用室内默认配置 `mapping_m.yaml` |
+| `--outdoor` / `--high-altitude` | 使用室外/高空配置 `mapping_high_altitude.yaml` |
 | `--orin` | 使用 Orin NX 优化配置（16GB） |
 | `--orin-nano` | 使用 Orin Nano 极限优化配置（8GB/低内存设备） |
 | `--driver` | 启动 Livox MID360 驱动（实时建图时需要） |
@@ -193,6 +203,9 @@ ros2 launch livox_ros_driver2 msg_MID360_launch.py
 
 # 终端 2: 启动 SLAM
 ros2 launch adaptive_lio run.launch.py
+
+# 室外/高空模式
+ros2 launch adaptive_lio run.launch.py config_mode:=outdoor
 ```
 
 ### 方式三：GUI 控制面板
@@ -200,6 +213,55 @@ ros2 launch adaptive_lio run.launch.py
 ```bash
 python3 ~/slam-mid360-volita/src/adaptive_lio/scripts/gui_launcher.py
 ```
+
+---
+
+## 配置模式
+
+### 室内模式 (`--indoor`)
+
+室内模式使用 `config/mapping_m.yaml`，适合近距离、结构密集、平面约束稳定的场景，例如室内房间、走廊、楼梯和中低速平台测试。
+
+主要特点：
+
+- 近场精细地图范围：`near_range: 25.0`
+- 邻域点要求更严格：`min_number_neighbors: 20`
+- 搜索半径较小：`radius_max: 1.2`
+- 更偏向精细、稳定的近距离匹配
+
+### 室外/高空模式 (`--outdoor` / `--high-altitude`)
+
+室外模式使用 `config/mapping_high_altitude.yaml`，面向高空、开阔区域、远距离结构较稀疏的场景。它不是把 MID360 的物理探测距离改大，而是让算法在远场点更稀疏时仍尽量形成可用约束。
+
+当前 outdoor 的距离边界：
+
+| 范围 | 实际含义 |
+|------|---------|
+| `0-40m` | 使用 near map 精细局部匹配，`near_range: 40.0` |
+| `40-80m` | 使用普通 voxel map 参与主建图/定位 |
+| `80m` | 正常 outdoor 主建图有效远场，`max_distance: 80.0` |
+| `48m` | 内存压力触发 aggressive cleanup 时的可能退化保留半径，来自 `0.6 * max_distance` |
+
+核心参数：
+
+```yaml
+map_options:
+  neig_options:
+    distance_max: 80
+    radius_max: 2.5
+
+odometry:
+  max_distance: 80.0
+  near_range: 40.0
+  min_number_neighbors: 10
+  max_number_neighbors: 35
+```
+
+因此 README 中的“室外有效距离”应理解为：
+
+> 正常 outdoor 有效远场是 80m；内存压力触发 aggressive cleanup 时可能退到 48m。
+
+MID360 标称可达约 100m，但高空 70-80m 是否稳定，仍取决于目标反射率、地面/建筑/树冠结构、姿态变化和点云密度。看得到远点不等于这些远点一定能稳定支撑定位建图。
 
 ---
 
@@ -567,6 +629,7 @@ slam-mid360-volita/
 ├── src/adaptive_lio/
 │   ├── config/
 │   │   ├── mapping_m.yaml           # 默认配置 (x86/高性能设备)
+│   │   ├── mapping_high_altitude.yaml # 室外/高空配置
 │   │   ├── mapping_orin_nx.yaml     # Orin NX 16GB 优化配置
 │   │   ├── mapping_orin_nano.yaml   # Orin Nano 8GB 极限优化配置
 │   │   └── adaptive_lio.rviz        # RViz 配置
