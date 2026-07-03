@@ -744,3 +744,547 @@ pcl_viewer map/dense_segment_0.pcd
 ## License
 
 BSD-3-Clause License
+
+---
+
+## DP180-Pro + MID360 联合运行、PTP 时间同步与位姿仲裁
+
+本节记录当前 Jetson 同时连接 DP180-Pro 相机和 Livox MID-360 雷达时的完整配置。目标不是让相机替代雷达建图，而是让雷达 SLAM 正常建图；当雷达里程计与相机 VIO 偏差过大时，系统切换为相信相机位姿，并继续把雷达点云累计到受保护地图 `/guarded_map`。
+
+### 1. 当前硬件与网络拓扑
+
+Jetson 主机：
+
+- 用户：`li`
+- 主机名：`ubuntu`
+- 管理网络：`192.168.137.3`
+- ROS2：Humble
+
+DP180-Pro 相机：
+
+- 设备 IP：`10.42.0.64`
+- Jetson 连接相机的网口：`enP8p1s0`
+- Jetson 在相机网段的 IP：`10.42.0.1/24`
+- SSH 用户：`linaro`
+- SSH 密码：`linaro`
+
+MID-360 雷达：
+
+- 雷达 IP：`192.168.1.118`
+- Jetson USB 转网口：`enx9c69d34bdc5e`
+- Jetson 在雷达网段的 IP：`192.168.1.5/24`
+
+检查链路：
+
+```bash
+ping 10.42.0.64
+ping 192.168.1.118
+ip -br addr
+```
+
+### 2. DP180-Pro 登录账号来源
+
+最初尝试 `compulab/compulab` 登录 DP180-Pro，但 SSH 认证失败。随后在设备 SSH 端口开放、且没有其它可用控制命令能进入系统的情况下，测试常见板卡出厂账号，`linaro/linaro` 登录成功。登录后确认：
+
+```bash
+hostname
+# linaro-alip
+
+id
+# uid=1000(linaro) ... groups=..., sudo, ...
+```
+
+因此当前 DP180-Pro 的实际系统账号是：
+
+```bash
+ssh linaro@10.42.0.64
+# password: linaro
+```
+
+### 3. 为什么必须先修 PTP
+
+`pose_guard_mapper` 默认启用严格时间安全检查：
+
+```yaml
+require_header_time_near_now: true
+max_wall_stamp_skew_sec: 5.0
+```
+
+也就是说，相机 VIO 的 `header.stamp` 必须接近 Jetson 当前系统时间，否则仲裁节点不会相信相机。之前的问题现象是：
+
+- `/S1/imu`、`/S1/vio_odom` 都有频率，说明相机和 ROS 桥接不是根因；
+- 但 `/S1/vio_odom` 的时间戳和 Jetson 当前时间相差约 372 天；
+- `pose_guard_mapper` 输出 `camera_ok=no`、`comparable=no`。
+
+根因是 DP180-Pro 的 Time Synchronizer 处于 `default` 模式，未作为 Jetson 的 PTP slave；同时 DP180-Pro 缺少 `bc`，导致 Vilota 自带脚本 `/opt/vilota/bin/vk_time_slave_ptp_software` 无法完成同步状态判断。
+
+### 4. Jetson 侧 PTP master 配置
+
+Jetson 使用软件时间戳模式作为 DP180-Pro 的 PTP grandmaster。服务文件：
+
+```bash
+/etc/systemd/system/dp180-ptp-master.service
+```
+
+内容：
+
+```ini
+[Unit]
+Description=DP180-Pro PTP master on Jetson camera Ethernet
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/ptp4l -2 -i enP8p1s0 -S -m --step_threshold=1 -f /opt/vilota/configs/time/ptp4l_master.conf
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启用：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now dp180-ptp-master.service
+```
+
+检查：
+
+```bash
+systemctl is-active dp180-ptp-master.service
+journalctl -u dp180-ptp-master.service -f
+```
+
+正常日志应包含：
+
+```text
+selected local clock ... as best master
+port 1: assuming the grand master role
+```
+
+### 5. DP180-Pro 侧 Time Synchronizer 配置
+
+DP180-Pro 使用 Vilota Manager 的 websocket/capnp 控制接口设置时间同步。核心设置：
+
+- `TimeRole = slaveSoftware`
+- `Autostart = true`
+- reload time synchronizer
+
+设置完成后查询结果应为：
+
+```text
+status: runningSynchronized
+optRole: slaveSoftware
+optAutostart: True
+```
+
+如果需要重新执行，可在 Jetson 上运行下面的 Python 脚本：
+
+```bash
+python3 - <<'PY'
+import sys, asyncio, capnp
+sys.path.append('/opt/vilota/messages')
+capnp.add_import_hook()
+import system_capnp
+from websockets.asyncio.client import connect
+
+async def send(ws, marker, field, value=None):
+    cmd = system_capnp.ManagerCommand.new_message()
+    cmd.marker = marker
+    t = cmd.variant.init('time')
+    if field == 'optRole':
+        t.variant.optRole = value
+    elif field == 'optAutostart':
+        t.variant.optAutostart = value
+    elif field == 'reload':
+        t.variant.reload = None
+    elif field == 'fetchSettings':
+        t.variant.fetchSettings = None
+    await ws.send(cmd.to_bytes())
+
+async def main():
+    async with connect('ws://10.42.0.64/socket', max_size=None) as ws:
+        await send(ws, 201, 'optRole', 'slaveSoftware')
+        await send(ws, 202, 'optAutostart', True)
+        await send(ws, 203, 'reload')
+        await send(ws, 204, 'fetchSettings')
+
+asyncio.run(main())
+PY
+```
+
+Jetson 如缺少依赖：
+
+```bash
+python3 -m pip install --user pycapnp websockets
+```
+
+DP180-Pro 缺少 `bc` 时，Vilota 时间脚本会报：
+
+```text
+/opt/vilota/bin/vk_time_slave_ptp_software: line 40: bc: command not found
+```
+
+修复方式是在 DP180-Pro 上安装 `bc`。如果 DP180-Pro 没有外网/DNS，可从其它机器下载 `bc_1.07.1-3_arm64.deb` 后传入：
+
+```bash
+scp bc_1.07.1-3_arm64.deb linaro@10.42.0.64:/tmp/
+ssh linaro@10.42.0.64
+sudo dpkg -i /tmp/bc_1.07.1-3_arm64.deb
+which bc
+```
+
+注意：这里没有修改 DP180-Pro 的相机/VIO 源码，只做了系统工具安装和 Time Synchronizer 持久化设置。
+
+### 6. DP180-Pro 相机与 VIO 启动
+
+PTP 必须先稳定，再启动相机和 VIO。否则 VIO 在运行过程中遇到系统时间跳变，位姿会出现极大漂移。
+
+推荐顺序：
+
+```bash
+systemctl is-active dp180-ptp-master.service
+
+/opt/vilota/bin/vk_system_control -r 10.42.0.64 camera reload 0 vk180-pro_light_rectified.json
+/opt/vilota/bin/vk_system_control -r 10.42.0.64 vio reload 0 vk180-pro_moderate_rectified.json
+```
+
+启动 ROS2 桥接：
+
+```bash
+tmux new-session -d -s dp180_bridge \
+  "bash -lc 'source /opt/ros/humble/setup.bash && source /home/li/dp180_ws/install/setup.bash && ros2 launch vk_ros2_driver example.launch.py'"
+```
+
+检查相机 ROS 话题：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/li/dp180_ws/install/setup.bash
+
+ros2 topic list | grep S1
+ros2 topic hz /S1/imu
+ros2 topic hz /S1/vio_odom
+ros2 topic echo /S1/vio_odom --once
+```
+
+正常频率大致为：
+
+- `/S1/imu`：约 190-200 Hz
+- `/S1/vio_odom`：约 15-16 Hz
+- `/S1/camd`、`/S1/stereo*`：约 16 Hz
+
+正常时间戳应接近 Jetson 当前 epoch：
+
+```bash
+date '+JETSON epoch=%s'
+ros2 topic echo /S1/vio_odom --once
+```
+
+### 7. MID-360 雷达配置
+
+Livox 配置文件：
+
+```bash
+/home/li/livox_ws/src/livox_ros_driver2/config/MID360_config.json
+/home/li/livox_ws/install/livox_ros_driver2/share/livox_ros_driver2/config/MID360_config.json
+```
+
+当前应配置为：
+
+- host IP：`192.168.1.5`
+- lidar IP：`192.168.1.118`
+
+检查：
+
+```bash
+grep -R "192.168.1.5\|192.168.1.118" \
+  /home/li/livox_ws/src/livox_ros_driver2/config/MID360_config.json \
+  /home/li/livox_ws/install/livox_ros_driver2/share/livox_ros_driver2/config/MID360_config.json
+```
+
+如果 USB 网口重启后没有 IP，临时设置：
+
+```bash
+sudo ip addr add 192.168.1.5/24 dev enx9c69d34bdc5e
+sudo ip link set enx9c69d34bdc5e up
+```
+
+检查雷达：
+
+```bash
+ping 192.168.1.118
+```
+
+仅修改 Livox JSON 配置通常不需要重新编译驱动；修改源码或消息定义才需要重新编译。
+
+### 8. 位姿仲裁功能
+
+新增包：
+
+```bash
+/home/li/slam-mid360-volita/src/pose_guard_mapper
+```
+
+主要文件：
+
+```bash
+src/pose_guard_mapper/src/pose_guard_mapper_node.cpp
+src/pose_guard_mapper/config/pose_guard_mapper.yaml
+src/pose_guard_mapper/launch/pose_guard_mapper.launch.py
+src/pose_guard_mapper/scripts/check_pose_guard_inputs.sh
+src/pose_guard_mapper/scripts/start_dp180_ptp_master.sh
+```
+
+输出：
+
+```bash
+/trusted_odom
+/guarded_map
+/pose_guard/status
+/pose_guard/save_map
+```
+
+仲裁逻辑：
+
+- 正常情况下相信 LiDAR SLAM；
+- 当 LiDAR 与 DP180 VIO 的位姿偏差超过阈值时，切换为相信 camera；
+- 点云仍来自 MID-360；
+- `/guarded_map` 使用当前可信位姿累计点云；
+- 如果相机时间戳不接近 Jetson 当前时间，直接判定 `camera_ok=no`，避免错误融合。
+
+重新编译：
+
+```bash
+cd /home/li/slam-mid360-volita
+source /opt/ros/humble/setup.bash
+source /home/li/livox_ws/install/setup.bash
+source /home/li/dp180_ws/install/setup.bash
+colcon build --packages-select pose_guard_mapper --symlink-install
+```
+
+### 9. 一键启动雷达 SLAM + 仲裁
+
+启动脚本已整合：
+
+```bash
+/home/li/slam-mid360-volita/src/adaptive_lio/bash/run_slam.sh
+```
+
+该脚本现在会自动 source：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/li/livox_ws/install/setup.bash
+source /home/li/dp180_ws/install/setup.bash
+source /home/li/slam-mid360-volita/install/setup.bash
+```
+
+默认启用 `pose_guard_mapper`，并在终端打印当前相信谁：
+
+```text
+[POSE_GUARD] 当前相信: LIDAR
+[POSE_GUARD] 当前相信: CAMERA
+```
+
+启动：
+
+```bash
+cd /home/li/slam-mid360-volita
+./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map
+```
+
+后台启动：
+
+```bash
+tmux new-session -d -s slam_guard \
+  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map'"
+```
+
+查看：
+
+```bash
+tmux attach -t slam_guard
+```
+
+只启动原雷达 SLAM、不启用仲裁：
+
+```bash
+./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --no-guard
+```
+
+### 10. 推荐完整启动顺序
+
+每次上电后按这个顺序最稳：
+
+```bash
+# 1. 确认 Jetson PTP master 正常
+systemctl is-active dp180-ptp-master.service
+
+# 2. 确认 DP180 时间同步正常
+python3 - <<'PY'
+import sys, asyncio, capnp
+sys.path.append('/opt/vilota/messages')
+capnp.add_import_hook()
+import system_capnp
+from websockets.asyncio.client import connect
+
+async def main():
+    async with connect('ws://10.42.0.64/socket', max_size=None) as ws:
+        cmd = system_capnp.ManagerCommand.new_message()
+        cmd.marker = 1
+        t = cmd.variant.init('time')
+        t.variant.fetchSettings = None
+        await ws.send(cmd.to_bytes())
+        for _ in range(8):
+            msg = await ws.recv()
+            with system_capnp.ManagerMessage.from_bytes(msg) as m:
+                print(m.to_dict())
+
+asyncio.run(main())
+PY
+
+# 3. 启动 DP180 camera/VIO
+/opt/vilota/bin/vk_system_control -r 10.42.0.64 camera reload 0 vk180-pro_light_rectified.json
+/opt/vilota/bin/vk_system_control -r 10.42.0.64 vio reload 0 vk180-pro_moderate_rectified.json
+
+# 4. 启动 DP180 ROS2 bridge
+tmux new-session -d -s dp180_bridge \
+  "bash -lc 'source /opt/ros/humble/setup.bash && source /home/li/dp180_ws/install/setup.bash && ros2 launch vk_ros2_driver example.launch.py'"
+
+# 5. 启动 MID-360 雷达 SLAM + 位姿仲裁
+tmux new-session -d -s slam_guard \
+  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map'"
+```
+
+### 11. 运行中验证
+
+相机：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/li/dp180_ws/install/setup.bash
+ros2 topic hz /S1/imu
+ros2 topic hz /S1/vio_odom
+ros2 topic echo /S1/vio_odom --once
+```
+
+雷达：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/li/livox_ws/install/setup.bash
+ros2 topic hz /livox/lidar
+ros2 topic hz /odom
+```
+
+仲裁：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/li/slam-mid360-volita/install/setup.bash
+ros2 topic echo /pose_guard/status
+ros2 topic hz /trusted_odom
+```
+
+正常状态示例：
+
+```text
+source=lidar reason=lidar camera_ok=yes comparable=yes aligned=yes
+```
+
+含义：
+
+- `source=lidar`：当前相信雷达；
+- `camera_ok=yes`：相机 VIO 数据存在且时间戳可信；
+- `comparable=yes`：雷达和相机位姿可以比较；
+- `aligned=yes`：两者偏差未超过阈值；
+- `source=camera`：雷达和相机偏差过大时，当前相信相机。
+
+### 12. 常见故障定位
+
+#### `/S1/*` 有频率，但 `camera_ok=no`
+
+优先检查时间戳：
+
+```bash
+date '+JETSON epoch=%s'
+ros2 topic echo /S1/vio_odom --once
+```
+
+如果 stamp 和 Jetson 当前时间差超过几秒，先修 PTP，不要调仲裁阈值。
+
+#### DP180 Time Sync 一直 `runningWaiting`
+
+检查 DP180 是否缺少 `bc`：
+
+```bash
+ssh linaro@10.42.0.64
+which bc
+```
+
+检查 Jetson master：
+
+```bash
+systemctl status dp180-ptp-master.service
+journalctl -u dp180-ptp-master.service -n 50
+```
+
+检查 DP180 slave：
+
+```bash
+ssh linaro@10.42.0.64
+ps -ef | grep -E 'ptp4l|vk_time' | grep -v grep
+ls -l /run/lock/vk_timesync
+```
+
+#### VIO 位姿突然变成十几万米
+
+这是 VIO 运行中遇到系统时间跳变造成的状态污染。处理方式：
+
+```bash
+/opt/vilota/bin/vk_system_control -r 10.42.0.64 camera reload 0 vk180-pro_light_rectified.json
+/opt/vilota/bin/vk_system_control -r 10.42.0.64 vio reload 0 vk180-pro_moderate_rectified.json
+tmux kill-session -t dp180_bridge
+tmux new-session -d -s dp180_bridge \
+  "bash -lc 'source /opt/ros/humble/setup.bash && source /home/li/dp180_ws/install/setup.bash && ros2 launch vk_ros2_driver example.launch.py'"
+```
+
+然后重启雷达 SLAM + 仲裁：
+
+```bash
+tmux kill-session -t slam_guard
+tmux new-session -d -s slam_guard \
+  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map'"
+```
+
+#### 雷达连不上
+
+```bash
+ip -br addr show enx9c69d34bdc5e
+ping 192.168.1.118
+```
+
+如果 USB 网口没有 `192.168.1.5/24`：
+
+```bash
+sudo ip addr add 192.168.1.5/24 dev enx9c69d34bdc5e
+sudo ip link set enx9c69d34bdc5e up
+```
+
+#### 保存地图
+
+原始雷达地图：
+
+```bash
+ros2 service call /save_map std_srvs/srv/Trigger
+```
+
+仲裁后地图：
+
+```bash
+ros2 service call /pose_guard/save_map std_srvs/srv/Trigger
+```

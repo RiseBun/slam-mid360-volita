@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>pose_guard_mapper</name>
+  <version>0.1.0</version>
+  <description>Pose guard and point cloud accumulator for LiDAR odometry with camera VIO fallback.</description>
+  <maintainer email="li@example.com">li</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>pcl_conversions</depend>
+  <depend>livox_ros_driver2</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

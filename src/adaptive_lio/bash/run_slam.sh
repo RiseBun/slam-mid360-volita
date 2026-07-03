@@ -11,6 +11,8 @@
 #   --orin          使用 Orin NX 优化配置 (16GB)
 #   --orin-nano     使用 Orin Nano 极限优化配置 (8GB/低内存设备)
 #   --driver        启动 Livox MID360 驱动 (实时模式需要)
+#   --guard         启动 LiDAR/相机位姿仲裁节点 (默认启用)
+#   --no-guard      不启动位姿仲裁节点
 #   --record-bag [PATH]  录制 rosbag (可选指定保存目录，默认当前目录)
 #   --dense [VOXEL]   启用 dense_map_mode（全分辨率PCD输出，无降采样）
 #                     可选 VOXEL 参数指定合并时降采样体素大小（米）
@@ -28,6 +30,7 @@
 #   ./run_slam.sh --orin --driver --no-rviz --map-path ~/map  # 实时建图
 #   ./run_slam.sh --orin-nano --driver --no-rviz              # Nano 实时建图
 #   ./run_slam.sh --driver --record-bag ~/bags --map-path ~/map  # 建图+录包
+#   ./run_slam.sh --driver --no-rviz                 # 实时建图 + 位姿仲裁
 #   ./run_slam.sh --orin --driver --dense --no-rviz             # 全分辨率PCD（不降采样）
 #   ./run_slam.sh --orin --driver --dense 0.02 --no-rviz       # 2cm体素降采样PCD
 #
@@ -53,6 +56,7 @@ DENSE_VOXEL=""
 RECORD_BAG=false
 RECORD_BAG_PATH=""
 CUSTOM_CONFIG=""
+USE_GUARD=true
 
 # 配置文件路径
 CONFIG_FILE="$PKG_DIR/config/mapping_m.yaml"
@@ -91,6 +95,8 @@ show_help() {
     echo "  --orin              使用 Orin NX 优化配置 (16GB)"
     echo "  --orin-nano         使用 Orin Nano 极限优化配置 (8GB/低内存)"
     echo "  --driver            启动 Livox MID360 驱动 (实时模式需要)"
+    echo "  --guard             启动 LiDAR/相机位姿仲裁节点 (默认启用)"
+    echo "  --no-guard          不启动位姿仲裁节点"
     echo "  --dense             启用 dense_map_mode (全分辨率PCD输出)"
     echo "  --record-bag [PATH] 录制 rosbag (可选指定保存目录，默认当前目录)"
     echo "  --config FILE       使用指定的配置文件"
@@ -103,6 +109,7 @@ show_help() {
     echo "  $0 --rviz"
     echo "  $0 --orin --no-rviz --bag /path/to/rosbag --rate 1.5"
     echo "  $0 --orin --driver --no-rviz --map-path ~/map  # 实时建图"
+    echo "  $0 --driver --no-rviz                          # 雷达驱动 + SLAM + 位姿仲裁"
     echo "  $0 --orin-nano --driver --no-rviz              # Nano 实时建图"
     echo "  $0 --driver --record-bag ~/bags --map-path ~/map  # 建图+录包"
     echo "  $0 --config /path/to/custom.yaml --map-path /tmp/slam_output/"
@@ -145,6 +152,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --driver)
             USE_DRIVER=true
+            shift
+            ;;
+        --guard)
+            USE_GUARD=true
+            shift
+            ;;
+        --no-guard)
+            USE_GUARD=false
             shift
             ;;
         --dense)
@@ -247,6 +262,14 @@ cleanup() {
     if [[ -n "$BAG_PID" ]] && kill -0 $BAG_PID 2>/dev/null; then
         kill $BAG_PID 2>/dev/null || true
     fi
+    if [[ -n "$GUARD_STATUS_PID" ]] && kill -0 $GUARD_STATUS_PID 2>/dev/null; then
+        kill $GUARD_STATUS_PID 2>/dev/null || true
+    fi
+    if [[ -n "$GUARD_PID" ]] && kill -0 $GUARD_PID 2>/dev/null; then
+        kill -INT $GUARD_PID 2>/dev/null || true
+        sleep 1
+        kill -9 $GUARD_PID 2>/dev/null || true
+    fi
     # 先停止录制（SIGINT 让 ros2 bag record 正常刷盘关闭）
     if [[ -n "$RECORD_PID" ]] && kill -0 $RECORD_PID 2>/dev/null; then
         log_info "停止 rosbag 录制..."
@@ -288,6 +311,11 @@ trap cleanup EXIT INT TERM
 # 检查环境
 check_environment() {
     log_info "检查环境依赖..."
+
+    # Allow this script to be run directly from a fresh terminal.
+    if [[ -f /opt/ros/humble/setup.bash ]]; then
+        source /opt/ros/humble/setup.bash
+    fi
     
     # 检查 ROS2
     if ! command -v ros2 &> /dev/null; then
@@ -307,12 +335,27 @@ check_environment() {
         source "$LIVOX_WS/install/setup.bash"
     fi
 
+    # source DP180/Vilota ROS bridge workspace when available.
+    DP180_WS="${DP180_WS_PATH:-$HOME/dp180_ws}"
+    if [[ -f "$DP180_WS/install/setup.bash" ]]; then
+        source "$DP180_WS/install/setup.bash"
+    elif [[ "$USE_GUARD" == true ]]; then
+        log_warn "未找到 DP180 ROS 工作空间: $DP180_WS"
+        log_warn "仲裁节点仍可启动，但 /S1/vio_odom 需要由相机侧 ROS 桥发布"
+    fi
+
     # source 工作空间
     source "$WS_DIR/install/setup.bash"
     
     # 检查包是否存在
     if ! ros2 pkg list 2>/dev/null | grep -q "adaptive_lio"; then
         log_error "未找到 adaptive_lio 包"
+        exit 1
+    fi
+
+    if [[ "$USE_GUARD" == true ]] && ! ros2 pkg list 2>/dev/null | grep -q "pose_guard_mapper"; then
+        log_error "未找到 pose_guard_mapper 包"
+        log_error "请先运行: cd $WS_DIR && colcon build --packages-select pose_guard_mapper --symlink-install"
         exit 1
     fi
     
@@ -397,6 +440,69 @@ start_slam_node() {
     log_info "节点已启动 (PID: $NODE_PID)"
 }
 
+# 启动 LiDAR/相机位姿仲裁节点，并在当前终端打印可信来源
+start_pose_guard() {
+    if [[ "$USE_GUARD" != true ]]; then
+        log_info "跳过位姿仲裁节点 (--no-guard)"
+        return
+    fi
+
+    log_info "启动 LiDAR/相机位姿仲裁节点..."
+    mkdir -p "$WS_DIR/log"
+    ros2 launch pose_guard_mapper pose_guard_mapper.launch.py \
+        > "$WS_DIR/log/pose_guard_mapper.log" 2>&1 &
+    GUARD_PID=$!
+    sleep 2
+
+    if ! kill -0 $GUARD_PID 2>/dev/null; then
+        log_error "位姿仲裁节点启动失败，日志如下:"
+        tail -80 "$WS_DIR/log/pose_guard_mapper.log" 2>/dev/null || true
+        exit 1
+    fi
+    log_info "位姿仲裁节点已启动 (PID: $GUARD_PID)"
+    log_info "仲裁输出: /trusted_odom, /guarded_map, /pose_guard/status"
+
+    python3 - <<'PY' &
+import rclpy
+from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
+from std_msgs.msg import String
+
+GREEN = "\033[0;32m"
+YELLOW = "\033[0;33m"
+CYAN = "\033[0;36m"
+NC = "\033[0m"
+
+
+class PoseGuardStatusPrinter(Node):
+    def __init__(self):
+        super().__init__("pose_guard_status_printer")
+        self.create_subscription(String, "/pose_guard/status", self.on_status, 10)
+
+    def on_status(self, msg):
+        line = msg.data
+        if "source=camera" in line:
+            print(f"{YELLOW}[POSE_GUARD] 当前相信: CAMERA  | {line}{NC}", flush=True)
+        elif "source=lidar" in line:
+            print(f"{GREEN}[POSE_GUARD] 当前相信: LIDAR   | {line}{NC}", flush=True)
+        else:
+            print(f"{CYAN}[POSE_GUARD] {line}{NC}", flush=True)
+
+
+rclpy.init()
+node = PoseGuardStatusPrinter()
+try:
+    rclpy.spin(node)
+except (KeyboardInterrupt, ExternalShutdownException):
+    pass
+finally:
+    node.destroy_node()
+    if rclpy.ok():
+        rclpy.shutdown()
+PY
+    GUARD_STATUS_PID=$!
+}
+
 # 启动 RViz2
 start_rviz() {
     if [[ "$USE_RVIZ" == true ]]; then
@@ -474,6 +580,7 @@ show_status() {
         *) echo -e "  模式:       室内默认模式" ;;
     esac
     echo -e "  Livox驱动:  $([ "$USE_DRIVER" == true ] && echo "启用" || echo "禁用")"
+    echo -e "  位姿仲裁:   $([ "$USE_GUARD" == true ] && echo "${GREEN}启用${NC}" || echo "禁用")"
     echo -e "  RViz2:      $([ "$USE_RVIZ" == true ] && echo "启用" || echo "禁用")"
     if [[ "$USE_DENSE" == true ]]; then
         if [[ -n "$DENSE_VOXEL" ]]; then
@@ -490,6 +597,10 @@ show_status() {
     [[ -n "$BAG_PATH" ]] && echo -e "  播放速率:   ${BAG_RATE}x"
     echo ""
     echo -e "  ${YELLOW}保存地图:${NC} ros2 service call /save_map std_srvs/srv/Trigger"
+    if [[ "$USE_GUARD" == true ]]; then
+        echo -e "  ${YELLOW}保存仲裁地图:${NC} ros2 service call /pose_guard/save_map std_srvs/srv/Trigger"
+        echo -e "  ${YELLOW}查看仲裁状态:${NC} ros2 topic echo /pose_guard/status"
+    fi
     if [[ "$USE_DENSE" == true ]]; then
         echo -e "  ${CYAN}(全分辨率点云，无降采样，分段保存，退出时自动流式合并)${NC}"
     fi
@@ -503,6 +614,7 @@ main() {
     modify_config
     start_driver
     start_slam_node
+    start_pose_guard
     start_rviz
     start_record_bag
     play_bag

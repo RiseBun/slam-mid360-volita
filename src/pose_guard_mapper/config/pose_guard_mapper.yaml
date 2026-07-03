@@ -1,0 +1,43 @@
+pose_guard_mapper:
+  ros__parameters:
+    lidar_odom_topic: /odom
+    camera_odom_topic: /S1/vio_odom
+    lidar_cloud_topic: /livox/lidar
+
+    trusted_odom_topic: /trusted_odom
+    guarded_map_topic: /guarded_map
+    status_topic: /pose_guard/status
+    save_map_service: /pose_guard/save_map
+    save_map_path: /home/li/slam-mid360-volita/map/guarded_map.pcd
+
+    map_frame: map
+    base_frame: base_link
+
+    # Reject LiDAR pose only after sustained disagreement.
+    position_threshold_m: 1.0
+    orientation_threshold_deg: 20.0
+    reject_count_threshold: 3
+
+    # Return to LiDAR only after sustained agreement.
+    recovery_position_threshold_m: 0.45
+    recovery_orientation_threshold_deg: 8.0
+    recover_count_threshold: 20
+
+    # Keep strict until PTP/header time is fixed.
+    max_time_diff_sec: 0.10
+    require_header_time_near_now: true
+    max_wall_stamp_skew_sec: 5.0
+    cloud_pose_max_age_sec: 1.0
+
+    # Reject clearly broken VIO poses before comparison.
+    max_reasonable_translation_m: 10000.0
+
+    # Guarded map accumulation.
+    map_voxel_size_m: 0.10
+    max_map_voxels: 2000000
+    publish_every_n_clouds: 10
+
+    # Pose of the LiDAR/base frame expressed in the camera VIO child frame.
+    # Keep identity until the rigid camera-LiDAR extrinsic is measured.
+    camera_child_to_lidar_base_translation: [0.0, 0.0, 0.0]
+    camera_child_to_lidar_base_rpy_deg: [0.0, 0.0, 0.0]
