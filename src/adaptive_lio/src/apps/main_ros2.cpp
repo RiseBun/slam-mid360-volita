@@ -1,8 +1,12 @@
 // c++ lib
 #include <cmath>
+#include <algorithm>
+#include <cctype>
+#include <deque>
 #include <vector>
 #include <mutex>
 #include <queue>
+#include <stdexcept>
 #include <thread>
 #include <chrono>
 #include <functional>
@@ -240,6 +244,38 @@ public:
         std::string laser_topic = yaml["common"]["lid_topic"].as<std::string>();
         std::string imu_topic = yaml["common"]["imu_topic"].as<std::string>();
         gnorm_ = yaml["common"]["gnorm"].as<double>();
+        if (!std::isfinite(gnorm_) || gnorm_ <= 0.0)
+            throw std::runtime_error("common.gnorm must be a positive finite number");
+
+        if (yaml["common"]["accel_unit"])
+        {
+            accel_unit_mode_ = yaml["common"]["accel_unit"].as<std::string>();
+            std::transform(accel_unit_mode_.begin(), accel_unit_mode_.end(), accel_unit_mode_.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (accel_unit_mode_ == "auto")
+            {
+                accel_scale_ready_ = false;
+            }
+            else if (accel_unit_mode_ == "g")
+            {
+                accel_scale_ = 9.81;
+            }
+            else if (accel_unit_mode_ == "mps2")
+            {
+                accel_scale_ = 1.0;
+            }
+            else
+            {
+                throw std::runtime_error("common.accel_unit must be one of: auto, g, mps2");
+            }
+        }
+        else
+        {
+            // Backward compatibility: without accel_unit, gnorm remains the manual scale.
+            accel_unit_mode_ = "manual";
+            accel_scale_ = gnorm_;
+        }
 
         // Read map save path from config (empty string means use default)
         if (yaml["common"]["map_save_path"])
@@ -350,7 +386,8 @@ public:
             RCLCPP_INFO(this->get_logger(), "Subscribing PointCloud2 on: %s", laser_topic.c_str());
         }
 
-        RCLCPP_INFO(this->get_logger(), "IMU topic: %s, gnorm: %f", imu_topic.c_str(), gnorm_);
+        RCLCPP_INFO(this->get_logger(), "IMU topic: %s, accel_unit: %s, manual gnorm: %.6f",
+                    imu_topic.c_str(), accel_unit_mode_.c_str(), gnorm_);
 
         // Save map service
         save_map_srv_ = this->create_service<std_srvs::srv::Trigger>(
@@ -785,21 +822,91 @@ private:
         }
     }
 
-    void imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
+    bool updateAutomaticAccelScale(const sensor_msgs::msg::Imu::ConstSharedPtr &msg)
+    {
+        const Vec3d raw_accel(msg->linear_acceleration.x,
+                              msg->linear_acceleration.y,
+                              msg->linear_acceleration.z);
+        const double norm = raw_accel.norm();
+        if (std::isfinite(norm) && norm > 0.05)
+        {
+            accel_norm_samples_.push_back(norm);
+            if (accel_norm_samples_.size() > 50)
+                accel_norm_samples_.pop_front();
+        }
+
+        constexpr size_t kMinSamples = 20;
+        if (accel_norm_samples_.size() < kMinSamples)
+            return false;
+
+        std::vector<double> sorted(accel_norm_samples_.begin(), accel_norm_samples_.end());
+        const auto middle = sorted.begin() + sorted.size() / 2;
+        std::nth_element(sorted.begin(), middle, sorted.end());
+        const double median_norm = *middle;
+
+        const char *detected_unit = nullptr;
+        if (median_norm >= 0.5 && median_norm <= 2.0)
+        {
+            accel_scale_ = 9.81;
+            detected_unit = "g";
+        }
+        else if (median_norm >= 5.0 && median_norm <= 15.0)
+        {
+            accel_scale_ = 1.0;
+            detected_unit = "m/s^2";
+        }
+        else
+        {
+            RCLCPP_WARN_THROTTLE(
+                this->get_logger(), *this->get_clock(), 2000,
+                "Cannot determine IMU acceleration unit: median norm=%.4f. "
+                "Keep the sensor stationary or set common.accel_unit to g/mps2.",
+                median_norm);
+            return false;
+        }
+
+        accel_scale_ready_ = true;
+        RCLCPP_INFO(this->get_logger(),
+                    "IMU acceleration unit detected: %s (median norm=%.4f, scale=%.5f)",
+                    detected_unit, median_norm, accel_scale_);
+        return true;
+    }
+
+    void pushScaledImu(const sensor_msgs::msg::Imu::ConstSharedPtr &msg)
     {
         double timestamp = toSec(msg->header.stamp);
         IMUPtr imu = std::make_shared<zjloc::IMU>(
             timestamp,
             Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z),
-            Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z) * gnorm_);
+            Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z) * accel_scale_);
         lio_->pushData(imu);
 
         // Republish IMU with scaled acceleration
         sensor_msgs::msg::Imu imu_repub = *msg;
-        imu_repub.linear_acceleration.x *= gnorm_;
-        imu_repub.linear_acceleration.y *= gnorm_;
-        imu_repub.linear_acceleration.z *= gnorm_;
+        imu_repub.linear_acceleration.x *= accel_scale_;
+        imu_repub.linear_acceleration.y *= accel_scale_;
+        imu_repub.linear_acceleration.z *= accel_scale_;
         pub_imu_repub_->publish(imu_repub);
+    }
+
+    void imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
+    {
+        if (!accel_scale_ready_)
+        {
+            pending_imu_messages_.push_back(msg);
+            if (pending_imu_messages_.size() > 500)
+                pending_imu_messages_.pop_front();
+
+            if (!updateAutomaticAccelScale(msg))
+                return;
+
+            for (const auto &pending : pending_imu_messages_)
+                pushScaledImu(pending);
+            pending_imu_messages_.clear();
+            return;
+        }
+
+        pushScaledImu(msg);
     }
 
     void saveMapCallback(
@@ -1194,6 +1301,11 @@ private:
     zjloc::lidarodom_m *lio_ = nullptr;
     zjloc::CloudConvert2 *convert_ = nullptr;
     double gnorm_ = 1.0;
+    std::string accel_unit_mode_ = "manual";
+    double accel_scale_ = 1.0;
+    bool accel_scale_ready_ = true;
+    std::deque<double> accel_norm_samples_;
+    std::deque<sensor_msgs::msg::Imu::ConstSharedPtr> pending_imu_messages_;
     std::thread process_thread_;
 
     // Path accumulator

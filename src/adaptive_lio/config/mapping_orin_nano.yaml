@@ -21,7 +21,8 @@ imu_init:
 common:
   imu_topic: /livox/imu
   lid_topic: /livox/lidar
-  gnorm: 1
+  accel_unit: auto # auto detects g vs m/s^2 during stationary startup; explicit: g or mps2
+  gnorm: 1         # legacy/manual scale, used only when accel_unit is omitted
   map_save_path: ""
   map_voxel_size: 0.15  # NX:0.1 → 0.15，降低输出地图密度
   # Sliding window saved map (preserves near-field detail)

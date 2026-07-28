@@ -19,7 +19,8 @@ imu_init:
 common:
   imu_topic: /livox/imu #/imu_raw   /gps/gtimu
   lid_topic: /livox/lidar #/points_raw  /rslidar_points /velodyne_points
-  gnorm: 1 # 9.805    # 部分数据，加速度模长为1->9.805gnorm
+  accel_unit: auto # auto detects g vs m/s^2 during stationary startup; explicit: g or mps2
+  gnorm: 1         # legacy/manual scale, used only when accel_unit is omitted
   map_save_path: ""  # 地图保存路径，空字符串表示使用默认路径（源码目录下的map文件夹）
   map_voxel_size: 0.05  # 地图降采样体素大小(米)，越小点越密集，默认0.1，建议0.02-0.2
   # Sliding window saved map (preserves near-field detail)

@@ -464,7 +464,8 @@ preprocess:
 common:
   imu_topic: /livox/imu
   lid_topic: /livox/lidar
-  gnorm: 1               # 加速度缩放因子
+  accel_unit: auto       # 静止启动时自动识别 g 或 m/s^2，也可显式设为 g / mps2
+  gnorm: 1               # 兼容旧配置；仅省略 accel_unit 时作为手动缩放因子
 ```
 
 ---
@@ -714,7 +715,7 @@ colcon build
 ### Q: 点云显示但位姿不更新
 
 1. 检查 IMU 数据：`ros2 topic echo /livox/imu`
-2. 确认 `gnorm` 参数正确
+2. 查看启动日志中的 IMU 单位识别结果；无法识别时显式设置 `accel_unit: g` 或 `accel_unit: mps2`
 3. 保持静止 2-3 秒等待初始化
 
 ### Q: 地图保存后点很稀疏
