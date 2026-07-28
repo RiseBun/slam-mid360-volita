@@ -11,6 +11,13 @@ preprocess:
   sweep_cut_num: 1
   degenerate_window_num: 10
 
+imu_init:
+  duration_sec: 2.0
+  max_gyro_variance: 0.5
+  max_accel_variance: 0.6
+  max_gyro_mean_rad_s: 0.05
+  max_gravity_norm_error: 0.5
+
 common:
   imu_topic: /livox/imu
   lid_topic: /livox/lidar
@@ -28,7 +35,8 @@ common:
   dense_voxel_size: 0.0
 
 mapping:
-  extrinsic_est_en: true
+  # Online extrinsic estimation is not implemented; these values are fixed.
+  extrinsic_est_en: false
   extrinsic_T: [0, 0, 0]
   extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
@@ -78,7 +86,10 @@ odometry:
   sampling_rate: 1.5
   max_num_residuals: 1200      # 保持默认（之前 1500 会引发队列饥饿）
   min_num_residuals: 50
-  motion_compensation: CONSTANT_VELOCITY
+  motion_compensation: CONTINUOUS
+  # High-altitude scenes often contain only one dominant plane. Keep the
+  # residual-count gate but do not reject solely on the normal-rank ratio.
+  min_localizability_ratio: 0.0
 
   beta_location_consistency: 0.001
   beta_orientation_consistency: 0.05    # 高空弱几何时，别把姿态一致性压得太死

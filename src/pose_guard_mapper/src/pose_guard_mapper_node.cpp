@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
+#include <exception>
 #include <filesystem>
 #include <limits>
 #include <mutex>
@@ -105,6 +106,19 @@ public:
       lidar_odom_topic_.c_str(), camera_odom_topic_.c_str(), lidar_cloud_topic_.c_str());
   }
 
+  ~PoseGuardMapperNode() override
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (map_.empty()) return;
+
+    std::string message;
+    if (saveMapToDisk(message)) {
+      RCLCPP_INFO(get_logger(), "%s", message.c_str());
+    } else {
+      RCLCPP_ERROR(get_logger(), "%s", message.c_str());
+    }
+  }
+
 private:
   enum class SourceMode
   {
@@ -128,6 +142,14 @@ private:
     Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
   };
 
+  struct PendingCloud
+  {
+    livox_ros_driver2::msg::CustomMsg::ConstSharedPtr msg;
+    rclcpp::Time start;
+    rclcpp::Time end;
+    rclcpp::Time received;
+  };
+
   void loadParameters()
   {
     lidar_odom_topic_ = declare_parameter<std::string>("lidar_odom_topic", "/odom");
@@ -138,7 +160,7 @@ private:
     status_topic_ = declare_parameter<std::string>("status_topic", "/pose_guard/status");
     save_map_service_ = declare_parameter<std::string>("save_map_service", "/pose_guard/save_map");
     save_map_path_ = declare_parameter<std::string>(
-      "save_map_path", "/home/li/slam-mid360-volita/map/guarded_map.pcd");
+      "save_map_path", "map/guarded_map.pcd");
 
     map_frame_ = declare_parameter<std::string>("map_frame", "map");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_link");
@@ -152,12 +174,18 @@ private:
       declare_parameter<double>("recovery_orientation_threshold_deg", 8.0) * kPi / 180.0;
     reject_count_threshold_ = declare_parameter<int>("reject_count_threshold", 3);
     recover_count_threshold_ = declare_parameter<int>("recover_count_threshold", 20);
+    camera_fallback_enabled_ = declare_parameter<bool>("camera_fallback_enabled", false);
 
     max_time_diff_sec_ = declare_parameter<double>("max_time_diff_sec", 0.10);
     require_header_time_near_now_ =
       declare_parameter<bool>("require_header_time_near_now", true);
     max_wall_stamp_skew_sec_ = declare_parameter<double>("max_wall_stamp_skew_sec", 5.0);
-    cloud_pose_max_age_sec_ = declare_parameter<double>("cloud_pose_max_age_sec", 1.0);
+    max_pose_interpolation_gap_sec_ =
+      declare_parameter<double>("max_pose_interpolation_gap_sec", 0.25);
+    max_pending_cloud_wait_sec_ =
+      declare_parameter<double>("max_pending_cloud_wait_sec", 1.0);
+    max_pending_clouds_ = static_cast<size_t>(std::max<int64_t>(
+      2, declare_parameter<int64_t>("max_pending_clouds", 100)));
 
     max_reasonable_translation_m_ =
       declare_parameter<double>("max_reasonable_translation_m", 10000.0);
@@ -166,6 +194,8 @@ private:
       std::max<int64_t>(1, declare_parameter<int64_t>("max_map_voxels", 2000000)));
     publish_every_n_clouds_ = std::max<int>(
       1, static_cast<int>(declare_parameter<int>("publish_every_n_clouds", 10)));
+    min_cloud_range_m_ = declare_parameter<double>("min_cloud_range_m", 0.1);
+    max_cloud_range_m_ = declare_parameter<double>("max_cloud_range_m", 250.0);
 
     const auto camera_to_lidar_t = declare_parameter<std::vector<double>>(
       "camera_child_to_lidar_base_translation", std::vector<double>{0.0, 0.0, 0.0});
@@ -173,6 +203,13 @@ private:
       "camera_child_to_lidar_base_rpy_deg", std::vector<double>{0.0, 0.0, 0.0});
     camera_child_to_lidar_base_ =
       makeTransformFromTranslationRpy(camera_to_lidar_t, camera_to_lidar_rpy_deg);
+
+    const auto base_from_lidar_t = declare_parameter<std::vector<double>>(
+      "base_from_lidar_translation", std::vector<double>{0.0, 0.0, 0.0});
+    const auto base_from_lidar_rpy_deg = declare_parameter<std::vector<double>>(
+      "base_from_lidar_rpy_deg", std::vector<double>{0.0, 0.0, 0.0});
+    base_from_lidar_ = makeTransformFromTranslationRpy(
+      base_from_lidar_t, base_from_lidar_rpy_deg);
   }
 
   Eigen::Isometry3d makeTransformFromTranslationRpy(
@@ -196,14 +233,36 @@ private:
     return transform;
   }
 
+  Eigen::Isometry3d interpolateTransform(
+    const Eigen::Isometry3d & lhs, const Eigen::Isometry3d & rhs, double alpha) const
+  {
+    alpha = std::clamp(alpha, 0.0, 1.0);
+    Eigen::Quaterniond q_lhs(lhs.rotation());
+    Eigen::Quaterniond q_rhs(rhs.rotation());
+    q_lhs.normalize();
+    q_rhs.normalize();
+
+    Eigen::Isometry3d result = Eigen::Isometry3d::Identity();
+    result.linear() = q_lhs.slerp(alpha, q_rhs).normalized().toRotationMatrix();
+    result.translation() =
+      (1.0 - alpha) * lhs.translation() + alpha * rhs.translation();
+    return result;
+  }
+
   PoseSample odomToSample(const nav_msgs::msg::Odometry & msg)
   {
     PoseSample sample;
     sample.stamp = rclcpp::Time(msg.header.stamp);
     sample.received = now();
     sample.stamp_ok = stampLooksUsable(sample.stamp);
+    const auto & orientation = msg.pose.pose.orientation;
+    const double quaternion_norm_sq =
+      orientation.x * orientation.x + orientation.y * orientation.y +
+      orientation.z * orientation.z + orientation.w * orientation.w;
+    const bool orientation_ok =
+      std::isfinite(quaternion_norm_sq) && quaternion_norm_sq > 1e-12;
     sample.pose = poseMsgToEigen(msg.pose.pose);
-    sample.pose_ok = poseLooksUsable(sample.pose);
+    sample.pose_ok = orientation_ok && poseLooksUsable(sample.pose);
     return sample;
   }
 
@@ -261,7 +320,12 @@ private:
     PoseSample sample = odomToSample(*msg);
     sample.pose = sample.pose * camera_child_to_lidar_base_;
     sample.pose_ok = sample.pose_ok && poseLooksUsable(sample.pose);
+    if (!sample.stamp_ok || !sample.pose_ok) return;
 
+    if (!camera_buffer_.empty() && sample.stamp < camera_buffer_.back().stamp) {
+      camera_buffer_.clear();
+      alignment_ready_ = false;
+    }
     camera_buffer_.push_back(sample);
     while (camera_buffer_.size() > 1000) {
       camera_buffer_.pop_front();
@@ -272,7 +336,7 @@ private:
   {
     std::lock_guard<std::mutex> lock(mutex_);
     PoseSample lidar = odomToSample(*msg);
-    if (!lidar.pose_ok) {
+    if (!lidar.stamp_ok || !lidar.pose_ok) {
       publishStatus("lidar_pose_invalid", false, false, std::numeric_limits<double>::quiet_NaN(),
         std::numeric_limits<double>::quiet_NaN());
       return;
@@ -280,7 +344,7 @@ private:
 
     PoseSample camera;
     double camera_time_diff = std::numeric_limits<double>::infinity();
-    const bool camera_ok = findNearestCamera(lidar.stamp, camera, camera_time_diff);
+    const bool camera_ok = findCameraAt(lidar.stamp, camera, camera_time_diff);
 
     double position_error = std::numeric_limits<double>::quiet_NaN();
     double orientation_error = std::numeric_limits<double>::quiet_NaN();
@@ -291,9 +355,7 @@ private:
       if (!alignment_ready_) {
         map_from_camera_odom_ = lidar.pose * camera.pose.inverse();
         alignment_ready_ = true;
-        RCLCPP_WARN(
-          get_logger(),
-          "Initialized camera-to-LiDAR odom alignment. This assumes the rig is static at startup.");
+        RCLCPP_INFO(get_logger(), "Initialized camera-to-LiDAR odom alignment.");
       }
       camera_in_map = map_from_camera_odom_ * camera.pose;
       position_error = (lidar.pose.translation() - camera_in_map.translation()).norm();
@@ -301,12 +363,21 @@ private:
       comparable = true;
     }
 
+    const SourceMode previous_mode = source_mode_;
     updateSourceMode(camera_ok, comparable, position_error, orientation_error);
 
-    Eigen::Isometry3d trusted_pose = lidar.pose;
+    if (previous_mode != source_mode_ && latest_trusted_pose_ready_) {
+      if (source_mode_ == SourceMode::Camera && camera_ok && alignment_ready_) {
+        camera_continuity_ = latest_trusted_pose_.pose * camera_in_map.inverse();
+      } else {
+        lidar_continuity_ = latest_trusted_pose_.pose * lidar.pose.inverse();
+      }
+    }
+
+    Eigen::Isometry3d trusted_pose = lidar_continuity_ * lidar.pose;
     std::string reason = "lidar";
     if (source_mode_ == SourceMode::Camera && camera_ok && alignment_ready_) {
-      trusted_pose = camera_in_map;
+      trusted_pose = camera_continuity_ * camera_in_map;
       reason = "camera";
     } else if (!camera_ok) {
       reason = "lidar_camera_unavailable";
@@ -316,35 +387,62 @@ private:
 
     publishTrustedOdom(*msg, trusted_pose, reason);
     pushTrustedPose(lidar.stamp, trusted_pose);
+    processPendingClouds();
     publishStatus(reason, camera_ok, comparable, position_error, orientation_error, camera_time_diff);
   }
 
-  bool findNearestCamera(const rclcpp::Time & target, PoseSample & out, double & best_diff) const
+  bool findCameraAt(const rclcpp::Time & target, PoseSample & out, double & best_diff) const
   {
     if (!stampLooksUsable(target)) {
       return false;
     }
 
-    bool found = false;
     best_diff = std::numeric_limits<double>::infinity();
+    const PoseSample * before = nullptr;
+    const PoseSample * after = nullptr;
     for (const auto & sample : camera_buffer_) {
-      if (!sample.stamp_ok || !sample.pose_ok) {
-        continue;
-      }
-      const double diff = std::abs((sample.stamp - target).seconds());
-      if (diff < best_diff) {
-        best_diff = diff;
-        out = sample;
-        found = true;
+      if (!sample.stamp_ok || !sample.pose_ok) continue;
+      if (sample.stamp <= target) before = &sample;
+      if (sample.stamp >= target) {
+        after = &sample;
+        break;
       }
     }
 
-    return found && best_diff <= max_time_diff_sec_;
+    if (before && after) {
+      const double before_diff = std::abs((target - before->stamp).seconds());
+      const double after_diff = std::abs((after->stamp - target).seconds());
+      best_diff = std::max(before_diff, after_diff);
+      if (best_diff > max_time_diff_sec_) return false;
+
+      out = *before;
+      const double span = (after->stamp - before->stamp).seconds();
+      if (span > 1e-9) {
+        out.pose = interpolateTransform(before->pose, after->pose, before_diff / span);
+      }
+      out.stamp = target;
+      out.stamp_ok = true;
+      out.pose_ok = true;
+      return true;
+    }
+
+    const PoseSample * nearest = before ? before : after;
+    if (!nearest) return false;
+    best_diff = std::abs((nearest->stamp - target).seconds());
+    if (best_diff > max_time_diff_sec_) return false;
+    out = *nearest;
+    return true;
   }
 
   void updateSourceMode(
     bool camera_ok, bool comparable, double position_error, double orientation_error)
   {
+    if (!camera_fallback_enabled_) {
+      source_mode_ = SourceMode::Lidar;
+      reject_count_ = 0;
+      recover_count_ = 0;
+      return;
+    }
     if (!camera_ok) {
       if (source_mode_ == SourceMode::Camera) {
         RCLCPP_WARN(get_logger(), "Camera fallback lost; returning to LiDAR odometry.");
@@ -411,6 +509,15 @@ private:
     trusted.stamp = stamp;
     trusted.received = now();
     trusted.pose = pose;
+    if (!trusted_poses_.empty() && stamp < trusted_poses_.back().stamp) {
+      trusted_poses_.clear();
+      pending_clouds_.clear();
+    } else if (!trusted_poses_.empty() && stamp == trusted_poses_.back().stamp) {
+      trusted_poses_.back() = trusted;
+      latest_trusted_pose_ = trusted;
+      latest_trusted_pose_ready_ = true;
+      return;
+    }
     trusted_poses_.push_back(trusted);
     latest_trusted_pose_ = trusted;
     latest_trusted_pose_ready_ = true;
@@ -424,56 +531,149 @@ private:
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    TrustedPose pose;
-    if (!selectPoseForCloud(rclcpp::Time(msg->header.stamp), pose)) {
-      publishStatus("skip_cloud_no_trusted_pose", false, false,
+    if (msg->points.empty()) return;
+
+    const rclcpp::Time cloud_stamp(msg->header.stamp);
+    if (!stampLooksUsable(cloud_stamp)) {
+      publishStatus("drop_cloud_invalid_stamp", false, false,
         std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
       return;
     }
 
+    uint32_t max_offset_ns = 0;
     for (const auto & point : msg->points) {
-      if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
-        continue;
-      }
-      const Eigen::Vector3d p_map = pose.pose * Eigen::Vector3d(point.x, point.y, point.z);
-      insertMapPoint(p_map, static_cast<float>(point.reflectivity));
+      max_offset_ns = std::max(max_offset_ns, point.offset_time);
     }
 
-    cloud_count_++;
-    if (cloud_count_ % publish_every_n_clouds_ == 0) {
-      publishGuardedMap(msg->header.stamp);
+    PendingCloud pending;
+    pending.msg = msg;
+    pending.start = cloud_stamp;
+    pending.end = pending.start + rclcpp::Duration::from_seconds(max_offset_ns * 1e-9);
+    pending.received = now();
+    pending_clouds_.push_back(std::move(pending));
+
+    while (pending_clouds_.size() > max_pending_clouds_) {
+      pending_clouds_.pop_front();
+      publishStatus("drop_cloud_queue_full", false, false,
+        std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
+    }
+
+    processPendingClouds();
+  }
+
+  void processPendingClouds()
+  {
+    while (!pending_clouds_.empty()) {
+      const auto & pending = pending_clouds_.front();
+      const double wait_age = (now() - pending.received).seconds();
+
+      if (trusted_poses_.empty()) {
+        if (wait_age <= max_pending_cloud_wait_sec_) break;
+        pending_clouds_.pop_front();
+        publishStatus("drop_cloud_pose_timeout", false, false,
+          std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
+        continue;
+      }
+
+      if (pending.start < trusted_poses_.front().stamp) {
+        pending_clouds_.pop_front();
+        publishStatus("drop_cloud_no_pose_before_scan", false, false,
+          std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
+        continue;
+      }
+
+      if (trusted_poses_.back().stamp < pending.end) {
+        if (wait_age <= max_pending_cloud_wait_sec_) break;
+        pending_clouds_.pop_front();
+        publishStatus("drop_cloud_no_pose_after_scan", false, false,
+          std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
+        continue;
+      }
+
+      const auto stamp = pending.msg->header.stamp;
+      if (!accumulateCloud(pending)) {
+        publishStatus("drop_cloud_pose_gap", false, false,
+          std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN());
+        pending_clouds_.pop_front();
+        continue;
+      }
+
+      pending_clouds_.pop_front();
+      cloud_count_++;
+      if (cloud_count_ % publish_every_n_clouds_ == 0) {
+        publishGuardedMap(stamp);
+      }
     }
   }
 
-  bool selectPoseForCloud(const rclcpp::Time & stamp, TrustedPose & out) const
+  bool accumulateCloud(const PendingCloud & pending)
   {
-    if (!latest_trusted_pose_ready_) {
-      return false;
-    }
+    if (trusted_poses_.size() < 2) return false;
+    if (pending.start < trusted_poses_.front().stamp ||
+        trusted_poses_.back().stamp < pending.end) return false;
 
-    bool found_by_stamp = false;
-    double best_diff = std::numeric_limits<double>::infinity();
-    if (stampLooksUsable(stamp)) {
-      for (const auto & pose : trusted_poses_) {
-        const double diff = std::abs((pose.stamp - stamp).seconds());
-        if (diff < best_diff) {
-          best_diff = diff;
-          out = pose;
-          found_by_stamp = true;
-        }
+    bool has_overlapping_interval = false;
+    for (size_t i = 0; i + 1 < trusted_poses_.size(); ++i) {
+      const auto & before = trusted_poses_[i];
+      const auto & after = trusted_poses_[i + 1];
+      if (after.stamp < pending.start) continue;
+      if (pending.end < before.stamp) break;
+
+      has_overlapping_interval = true;
+      const double span = (after.stamp - before.stamp).seconds();
+      if (span <= 0.0 || span > max_pose_interpolation_gap_sec_) return false;
+    }
+    if (!has_overlapping_interval) return false;
+
+    const double min_range_sq = min_cloud_range_m_ * min_cloud_range_m_;
+    const double max_range_sq = max_cloud_range_m_ * max_cloud_range_m_;
+    size_t pose_index = 0;
+    std::vector<pcl::PointXYZI> transformed_points;
+    transformed_points.reserve(pending.msg->points.size());
+
+    for (const auto & point : pending.msg->points) {
+      if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) continue;
+      if ((point.tag & 0x30) != 0x10 && (point.tag & 0x30) != 0x00) continue;
+
+      const Eigen::Vector3d p_lidar(point.x, point.y, point.z);
+      const double range_sq = p_lidar.squaredNorm();
+      if (range_sq < min_range_sq || range_sq > max_range_sq) continue;
+
+      const rclcpp::Time point_stamp = pending.start +
+        rclcpp::Duration::from_seconds(point.offset_time * 1e-9);
+      if (pose_index >= trusted_poses_.size() ||
+          point_stamp < trusted_poses_[pose_index].stamp) {
+        pose_index = 0;
       }
+      while (pose_index + 1 < trusted_poses_.size() &&
+             trusted_poses_[pose_index + 1].stamp < point_stamp) {
+        ++pose_index;
+      }
+      if (pose_index + 1 >= trusted_poses_.size()) return false;
+
+      const auto & before = trusted_poses_[pose_index];
+      const auto & after = trusted_poses_[pose_index + 1];
+      if (point_stamp < before.stamp || point_stamp > after.stamp) return false;
+
+      const double span = (after.stamp - before.stamp).seconds();
+      if (span <= 0.0 || span > max_pose_interpolation_gap_sec_) return false;
+      const double alpha = span > 1e-9 ? (point_stamp - before.stamp).seconds() / span : 0.0;
+      const Eigen::Isometry3d pose = interpolateTransform(before.pose, after.pose, alpha);
+      const Eigen::Vector3d p_map = pose * (base_from_lidar_ * p_lidar);
+
+      pcl::PointXYZI transformed;
+      transformed.x = static_cast<float>(p_map.x());
+      transformed.y = static_cast<float>(p_map.y());
+      transformed.z = static_cast<float>(p_map.z());
+      transformed.intensity = static_cast<float>(point.reflectivity);
+      transformed_points.push_back(transformed);
     }
 
-    if (found_by_stamp && best_diff <= max_time_diff_sec_) {
-      return true;
+    for (const auto & point : transformed_points) {
+      insertMapPoint(
+        Eigen::Vector3d(point.x, point.y, point.z), point.intensity);
     }
-
-    const double age = (now() - latest_trusted_pose_.received).seconds();
-    if (age <= cloud_pose_max_age_sec_) {
-      out = latest_trusted_pose_;
-      return true;
-    }
-    return false;
+    return true;
   }
 
   void insertMapPoint(const Eigen::Vector3d & point, float intensity)
@@ -533,15 +733,25 @@ private:
       return;
     }
 
-    std::filesystem::path output_path(save_map_path_);
-    if (!output_path.parent_path().empty()) {
-      std::filesystem::create_directories(output_path.parent_path());
-    }
+    response->success = saveMapToDisk(response->message);
+  }
 
-    auto cloud = buildMapCloud();
-    const int ret = pcl::io::savePCDFileBinary(save_map_path_, *cloud);
-    response->success = ret == 0;
-    response->message = ret == 0 ? ("saved " + save_map_path_) : ("failed to save " + save_map_path_);
+  bool saveMapToDisk(std::string & message)
+  {
+    try {
+      std::filesystem::path output_path(save_map_path_);
+      if (!output_path.parent_path().empty()) {
+        std::filesystem::create_directories(output_path.parent_path());
+      }
+
+      auto cloud = buildMapCloud();
+      const int ret = pcl::io::savePCDFileBinary(save_map_path_, *cloud);
+      message = ret == 0 ? ("saved " + save_map_path_) : ("failed to save " + save_map_path_);
+      return ret == 0;
+    } catch (const std::exception & error) {
+      message = "failed to save " + save_map_path_ + ": " + error.what();
+      return false;
+    }
   }
 
   void publishStatus(
@@ -563,7 +773,8 @@ private:
         << " aligned=" << yesNo(alignment_ready_)
         << " reject_count=" << reject_count_
         << " recover_count=" << recover_count_
-        << " map_voxels=" << map_.size();
+        << " map_voxels=" << map_.size()
+        << " pending_clouds=" << pending_clouds_.size();
     if (std::isfinite(position_error)) {
       oss << " pos_error_m=" << position_error;
     }
@@ -596,17 +807,25 @@ private:
   double recovery_orientation_threshold_rad_ = 8.0 * kPi / 180.0;
   int reject_count_threshold_ = 3;
   int recover_count_threshold_ = 20;
+  bool camera_fallback_enabled_ = false;
   double max_time_diff_sec_ = 0.10;
   bool require_header_time_near_now_ = true;
   double max_wall_stamp_skew_sec_ = 5.0;
-  double cloud_pose_max_age_sec_ = 1.0;
+  double max_pose_interpolation_gap_sec_ = 0.25;
+  double max_pending_cloud_wait_sec_ = 1.0;
+  size_t max_pending_clouds_ = 100;
   double max_reasonable_translation_m_ = 10000.0;
   double map_voxel_size_m_ = 0.10;
+  double min_cloud_range_m_ = 0.1;
+  double max_cloud_range_m_ = 250.0;
   size_t max_map_voxels_ = 2000000;
   int publish_every_n_clouds_ = 10;
 
   Eigen::Isometry3d camera_child_to_lidar_base_ = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3d base_from_lidar_ = Eigen::Isometry3d::Identity();
   Eigen::Isometry3d map_from_camera_odom_ = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3d lidar_continuity_ = Eigen::Isometry3d::Identity();
+  Eigen::Isometry3d camera_continuity_ = Eigen::Isometry3d::Identity();
   bool alignment_ready_ = false;
 
   SourceMode source_mode_ = SourceMode::Lidar;
@@ -615,6 +834,7 @@ private:
 
   std::deque<PoseSample> camera_buffer_;
   std::deque<TrustedPose> trusted_poses_;
+  std::deque<PendingCloud> pending_clouds_;
   TrustedPose latest_trusted_pose_;
   bool latest_trusted_pose_ready_ = false;
 

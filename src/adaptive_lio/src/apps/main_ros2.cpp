@@ -371,6 +371,13 @@ public:
 
     ~AdaptiveLioNode()
     {
+        // Subscriptions have stopped when the node is destroyed. Drain every
+        // scan that has IMU coverage before taking the final map snapshot.
+        if (lio_)
+            lio_->requestStop();
+        if (process_thread_.joinable())
+            process_thread_.join();
+
         // Wait for any background save/segment threads to finish
         if (save_thread_.joinable())
             save_thread_.join();
@@ -446,12 +453,6 @@ public:
                 RCLCPP_INFO(this->get_logger(), "[Memory Management] No data was processed, skipping merge");
             }
         }
-
-        // Signal processing thread to stop and discard queued data
-        if (lio_)
-            lio_->requestStop();
-        if (process_thread_.joinable())
-            process_thread_.join();
 
         zjloc::common::Timer::PrintAll();
         {
@@ -577,7 +578,8 @@ private:
                 cloud_msg.header.frame_id = "map";
                 if (topic_name == "laser")
                 {
-                    pub_scan_->publish(cloud_msg);
+                    if (rclcpp::ok())
+                        pub_scan_->publish(cloud_msg);
 
                     if (dense_map_mode_)
                     {
@@ -649,7 +651,8 @@ private:
                     tf_msg.transform.rotation.y = q_current.y();
                     tf_msg.transform.rotation.z = q_current.z();
                     tf_msg.transform.rotation.w = q_current.w();
-                    tf_broadcaster_->sendTransform(tf_msg);
+                    if (rclcpp::ok())
+                        tf_broadcaster_->sendTransform(tf_msg);
 
                     // Publish odometry
                     nav_msgs::msg::Odometry odom;
@@ -663,7 +666,8 @@ private:
                     odom.pose.pose.position.x = current_pos.x();
                     odom.pose.pose.position.y = current_pos.y();
                     odom.pose.pose.position.z = current_pos.z();
-                    pub_odom_->publish(odom);
+                    if (rclcpp::ok())
+                        pub_odom_->publish(odom);
 
                     // Publish path
                     geometry_msgs::msg::PoseStamped laser_pose;
@@ -676,7 +680,8 @@ private:
                     if (laser_odo_path_.poses.size() > kMaxPathPoses)
                         laser_odo_path_.poses.erase(laser_odo_path_.poses.begin());
                     laser_odo_path_.header.frame_id = "map";
-                    pub_path_->publish(laser_odo_path_);
+                    if (rclcpp::ok())
+                        pub_path_->publish(laser_odo_path_);
 
                     // Save trajectory in TUM format
                     if (traj_fout_.is_open())
@@ -705,7 +710,8 @@ private:
                     tf_msg.transform.rotation.y = q_current.y();
                     tf_msg.transform.rotation.z = q_current.z();
                     tf_msg.transform.rotation.w = q_current.w();
-                    tf_broadcaster_->sendTransform(tf_msg);
+                    if (rclcpp::ok())
+                        tf_broadcaster_->sendTransform(tf_msg);
                 }
                 return true;
             });
@@ -716,10 +722,13 @@ private:
             {
                 std_msgs::msg::Float32 msg;
                 msg.data = time1;
-                if (topic_name == "velocity")
-                    pub_vel_->publish(msg);
-                else
-                    pub_dist_->publish(msg);
+                if (rclcpp::ok())
+                {
+                    if (topic_name == "velocity")
+                        pub_vel_->publish(msg);
+                    else
+                        pub_dist_->publish(msg);
+                }
                 return true;
             });
 

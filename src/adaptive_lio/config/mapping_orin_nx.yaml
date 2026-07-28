@@ -1,4 +1,5 @@
 %YAML 1.2
+---
 # Orin NX 16GB 优化配置
 # 相比默认配置，降低了计算复杂度和内存占用，以适应 ARM 平台
 
@@ -8,6 +9,13 @@ preprocess:
   blind: 0.1
   sweep_cut_num: 1
   degenerate_window_num: 10
+
+imu_init:
+  duration_sec: 2.0
+  max_gyro_variance: 0.5
+  max_accel_variance: 0.6
+  max_gyro_mean_rad_s: 0.05
+  max_gravity_norm_error: 0.5
 
 common:
   imu_topic: /livox/imu
@@ -22,7 +30,8 @@ common:
   max_near_buffer_points: 2000000
 
 mapping:
-  extrinsic_est_en: true
+  # Online extrinsic estimation is not implemented; these values are fixed.
+  extrinsic_est_en: false
   extrinsic_T: [0, 0, 0]
   extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
@@ -73,7 +82,8 @@ odometry:
   sampling_rate: 1.0       # 1.5 → 1.0，降低采样率
   max_num_residuals: 800   # 1200 → 800，减少残差数量
   min_num_residuals: 30    # 50 → 30
-  motion_compensation: CONSTANT_VELOCITY
+  motion_compensation: CONTINUOUS
+  min_localizability_ratio: 0.01
   beta_location_consistency: 0.001
   beta_orientation_consistency: 0.1
   beta_constant_velocity: 0.001

@@ -28,11 +28,13 @@ namespace zjloc
         struct Options
         {
             Options() {}
-            double init_time_seconds_ = 1.0;            // 静止时间
+            double init_time_seconds_ = 2.0;            // Required stationary window
             int init_imu_queue_max_size_ = 2000;        // 初始化IMU队列最大长度
             int static_odom_pulse_ = 5;                 // 静止时轮速计输出噪声
             double max_static_gyro_var = 0.5;           // 静态下陀螺测量方差
             double max_static_acce_var = 0.6;           // 静态下加计测量方差/0.06
+            double max_static_gyro_mean_ = 0.05;        // rad/s
+            double max_gravity_norm_error_ = 0.5;       // m/s^2
             double gravity_norm_ = 9.81;                // 重力大小
             bool use_speed_for_static_checking_ = true; // 是否使用odom来判断车辆静止（部分数据集没有odom选项）
         };
@@ -53,6 +55,7 @@ namespace zjloc
         Vec3d GetInitBa() const { return init_ba_; }
         Vec3d GetGravity() const { return gravity_; }
         Vec3d GetMeanAcc() const { return mean_acc_; }
+        double GetCurrentTime() const { return current_time_; }
 
     private:
         /// 尝试对系统初始化

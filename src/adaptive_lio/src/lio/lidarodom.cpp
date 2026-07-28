@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <iomanip>
 #include <algorithm>
+#include <stdexcept>
 
 namespace zjloc
 {
@@ -37,6 +38,8 @@ namespace zjloc
      {
           delete prev_state_;
           delete last_state_;
+          delete current_state;
+          delete mmap;
           delete huber_loss_;
           delete quaternion_parameterization_;
      }
@@ -117,6 +120,7 @@ namespace zjloc
                OPTION_CLAUSE(odometry_node, options_, beta_orientation_consistency, double);
                OPTION_CLAUSE(odometry_node, options_, beta_constant_velocity, double);
                OPTION_CLAUSE(odometry_node, options_, beta_small_velocity, double);
+               OPTION_CLAUSE(odometry_node, options_, min_localizability_ratio, double);
                OPTION_CLAUSE(odometry_node, options_, thres_orientation_norm, double);
                OPTION_CLAUSE(odometry_node, options_, thres_translation_norm, double);
                OPTION_CLAUSE(odometry_node, options_, satu_acc, double);
@@ -127,20 +131,40 @@ namespace zjloc
      bool lidarodom_m::init(const std::string &config_yaml)
      {
           config_yaml_ = config_yaml;
+          auto yaml = YAML::LoadFile(config_yaml_);
+
           StaticIMUInit::Options imu_init_options;
           imu_init_options.use_speed_for_static_checking_ = false; // 本节数据不需要轮速计
+          if (yaml["imu_init"])
+          {
+               const auto imu_node = yaml["imu_init"];
+               if (imu_node["duration_sec"])
+                    imu_init_options.init_time_seconds_ = imu_node["duration_sec"].as<double>();
+               if (imu_node["max_gyro_variance"])
+                    imu_init_options.max_static_gyro_var = imu_node["max_gyro_variance"].as<double>();
+               if (imu_node["max_accel_variance"])
+                    imu_init_options.max_static_acce_var = imu_node["max_accel_variance"].as<double>();
+               if (imu_node["max_gyro_mean_rad_s"])
+                    imu_init_options.max_static_gyro_mean_ = imu_node["max_gyro_mean_rad_s"].as<double>();
+               if (imu_node["max_gravity_norm_error"])
+                    imu_init_options.max_gravity_norm_error_ = imu_node["max_gravity_norm_error"].as<double>();
+          }
           imu_init_ = StaticIMUInit(imu_init_options);
 
-          auto yaml = YAML::LoadFile(config_yaml_);
           delay_time_ = yaml["delay_time"].as<double>();
           // lidar和IMU外参
           std::vector<double> ext_t = yaml["mapping"]["extrinsic_T"].as<std::vector<double>>();
           std::vector<double> ext_r = yaml["mapping"]["extrinsic_R"].as<std::vector<double>>();
           Vec3d lidar_T_wrt_IMU = math::VecFromArray(ext_t);
           Mat3d lidar_R_wrt_IMU = math::MatFromArray(ext_r);
+          if (yaml["mapping"]["extrinsic_est_en"] &&
+              yaml["mapping"]["extrinsic_est_en"].as<bool>())
+          {
+               LOG(WARNING) << "extrinsic_est_en is not implemented; using the configured fixed extrinsic";
+          }
           std::cout << yaml["mapping"]["extrinsic_R"] << std::endl;
           Eigen::Quaterniond q_IL(lidar_R_wrt_IMU);
-          q_IL.normalized();
+          q_IL.normalize();
           lidar_R_wrt_IMU = q_IL;
           // init TIL
           TIL_ = SE3(q_IL, lidar_T_wrt_IMU);
@@ -211,16 +235,20 @@ namespace zjloc
           {
           case NONE:
           case CONSTANT_VELOCITY:
+               if (options_.icpmodel != POINT_TO_PLANE)
+                    throw std::invalid_argument(
+                        "NONE/CONSTANT_VELOCITY motion compensation requires POINT_TO_PLANE");
                options_.point_to_plane_with_distortion = false;
-               options_.icpmodel = POINT_TO_PLANE;
                break;
           case ITERATIVE:
+               if (options_.icpmodel != POINT_TO_PLANE)
+                    throw std::invalid_argument("ITERATIVE motion compensation requires POINT_TO_PLANE");
                options_.point_to_plane_with_distortion = true;
-               options_.icpmodel = POINT_TO_PLANE;
                break;
           case CONTINUOUS:
+               if (options_.icpmodel != CT_POINT_TO_PLANE)
+                    throw std::invalid_argument("CONTINUOUS motion compensation requires CT_POINT_TO_PLANE");
                options_.point_to_plane_with_distortion = true;
-               options_.icpmodel = CT_POINT_TO_PLANE;
                break;
           }
           LOG(WARNING) << "motion_compensation:" << options_.motion_compensation << ", model: " << options_.icpmodel;
@@ -253,6 +281,7 @@ namespace zjloc
 
      void lidarodom_m::pushData(const std::vector<point3D> &msg, std::pair<double, double> data)
      {
+          std::lock_guard<std::mutex> lock(mtx_buf);
           if (data.first < last_timestamp_lidar_)
           {
                LOG(ERROR) << "lidar loop back, clear buffer";
@@ -260,16 +289,15 @@ namespace zjloc
                time_buffer_.clear();
           }
 
-          mtx_buf.lock();
           lidar_buffer_.push_back(msg);
           time_buffer_.push_back(data);
           last_timestamp_lidar_ = data.first;
-          mtx_buf.unlock();
           cond.notify_one();
      }
      void lidarodom_m::pushData(IMUPtr imu)
      {
           double timestamp = imu->timestamp_;
+          std::lock_guard<std::mutex> lock(mtx_buf);
           if (timestamp < last_timestamp_imu_)
           {
                LOG(WARNING) << "imu loop back, clear buffer";
@@ -277,10 +305,7 @@ namespace zjloc
           }
 
           last_timestamp_imu_ = timestamp;
-
-          mtx_buf.lock();
           imu_buffer_.emplace_back(imu);
-          mtx_buf.unlock();
           cond.notify_one();
      }
 
@@ -291,21 +316,23 @@ namespace zjloc
                std::vector<MeasureGroup> measurements;
                std::unique_lock<std::mutex> lk(mtx_buf);
                cond.wait(lk, [&]
-                         { return (measurements = getMeasureMents()).size() != 0 || stop_requested_.load(); });
-               lk.unlock();
+                         {
+                              measurements = getMeasureMents(stop_requested_.load());
+                              return !measurements.empty() || stop_requested_.load();
+                         });
 
-               // If stop requested, discard remaining queued data and exit
-               if (stop_requested_.load())
+               if (measurements.empty() && stop_requested_.load())
                {
-                    std::lock_guard<std::mutex> guard(mtx_buf);
-                    size_t remaining = lidar_buffer_.size();
+                    const size_t remaining = lidar_buffer_.size();
                     lidar_buffer_.clear();
                     imu_buffer_.clear();
                     time_buffer_.clear();
+                    lk.unlock();
                     if (remaining > 0)
-                         printf("\n[SHUTDOWN] Discarded %zu queued frames for fast exit.\n", remaining);
+                         printf("\n[SHUTDOWN] Discarded %zu incomplete LiDAR frames.\n", remaining);
                     return;
                }
+               lk.unlock();
 
                for (auto &m : measurements)
                {
@@ -410,11 +437,13 @@ namespace zjloc
                                          "pub cloud");
 
           delete p_frame->p_state;
-          p_frame->p_state = new state(current_state, true);
+          p_frame->p_state = nullptr;
           delete prev_state_;
           prev_state_ = last_state_;
           last_state_ = new state(current_state, true);
-          current_state = new state(current_state, false);
+          state *completed_state = current_state;
+          current_state = new state(completed_state, false);
+          delete completed_state;
 
           if (prev_state_ != nullptr && last_state_ != nullptr)
                cache_vel = (last_state_->translation - prev_state_->translation) /
@@ -452,18 +481,17 @@ namespace zjloc
           std::vector<point3D>().swap(const_surf);
      }
 
-     void lidarodom_m::poseEstimation(cloudFrame *p_frame)
+     bool lidarodom_m::poseEstimation(cloudFrame *p_frame)
      {
-          //   TODO: check current_state data
+          bool pose_valid = true;
           if (index_frame > 1)
           {
                zjloc::common::Timer::Evaluate([&]()
-                                              { optimize(p_frame); },
+                                              { pose_valid = optimize(p_frame); },
                                               "optimize");
           }
 
-          bool add_points = true;
-          if (add_points)
+          if (pose_valid)
           { //   update map here
                zjloc::common::Timer::Evaluate([&]()
                                               { map_incremental(p_frame); },
@@ -473,9 +501,10 @@ namespace zjloc
           zjloc::common::Timer::Evaluate([&]()
                                          { lasermap_fov_segment(); },
                                          "fov segment");
+          return pose_valid;
      }
 
-     void lidarodom_m::optimize(cloudFrame *p_frame)
+     bool lidarodom_m::optimize(cloudFrame *p_frame)
      {
 
           state *previous_state = nullptr;
@@ -488,6 +517,22 @@ namespace zjloc
           Eigen::Quaterniond end_quat = Eigen::Quaterniond(curr_state->rotation);
           Eigen::Vector3d begin_t = curr_state->translation_begin;
           Eigen::Vector3d end_t = curr_state->translation;
+          const Eigen::Quaterniond predicted_begin_quat = begin_quat;
+          const Eigen::Quaterniond predicted_end_quat = end_quat;
+          const Eigen::Vector3d predicted_begin_t = begin_t;
+          const Eigen::Vector3d predicted_end_t = end_t;
+
+          auto restorePrediction = [&]()
+          {
+               p_frame->p_state->rotation_begin = predicted_begin_quat;
+               p_frame->p_state->rotation = predicted_end_quat;
+               p_frame->p_state->translation_begin = predicted_begin_t;
+               p_frame->p_state->translation = predicted_end_t;
+               current_state->rotation_begin = predicted_begin_quat;
+               current_state->rotation = predicted_end_quat;
+               current_state->translation_begin = predicted_begin_t;
+               current_state->translation = predicted_end_t;
+          };
 
           if (p_frame->frame_id > 1)
           {
@@ -568,8 +613,7 @@ namespace zjloc
                // addSurfCost(surfFactor, normalVec, surf_keypoints, p_frame);
                addSurfCostFactor(surfFactor, normalVec, surf_keypoints, p_frame);
 
-               //   TODO: 退化后，该如何处理
-               checkLocalizability(normalVec);
+               const double localizability_ratio = checkLocalizability(normalVec);
 
                int surf_num = 0;
                if (options_.log_print)
@@ -633,10 +677,20 @@ namespace zjloc
 
                if (surf_num < options_.min_num_residuals)
                {
-                    std::stringstream ss_out;
-                    ss_out << "[Optimization] Error : not enough keypoints selected in ct-icp !" << std::endl;
-                    ss_out << "[Optimization] number_of_residuals : " << surf_num << std::endl;
-                    std::cout << "ERROR: " << ss_out.str();
+                    LOG(WARNING) << "Rejecting frame " << p_frame->frame_id
+                                 << ": only " << surf_num << " ICP residuals";
+                    restorePrediction();
+                    return false;
+               }
+
+               if (options_.min_localizability_ratio > 0.0 &&
+                   localizability_ratio >= 0.0 &&
+                   localizability_ratio < options_.min_localizability_ratio)
+               {
+                    LOG(WARNING) << "Rejecting degenerate frame " << p_frame->frame_id
+                                 << ": normal singular ratio=" << localizability_ratio;
+                    restorePrediction();
+                    return false;
                }
 
                ceres::Solver::Summary summary;
@@ -645,8 +699,10 @@ namespace zjloc
 
                if (!summary.IsSolutionUsable())
                {
-                    std::cout << summary.FullReport() << std::endl;
-                    throw std::runtime_error("Error During Optimization");
+                    LOG(ERROR) << "Rejecting unusable Ceres solution at frame " << p_frame->frame_id
+                               << ": " << summary.BriefReport();
+                    restorePrediction();
+                    return false;
                }
 
                begin_quat.normalize();
@@ -697,6 +753,7 @@ namespace zjloc
 
           //   transpose point before added
           transformKeypoints(p_frame->point_surf);
+          return true;
      }
 
      double lidarodom_m::checkLocalizability(std::vector<Eigen::Vector3d> planeNormals)
@@ -730,7 +787,7 @@ namespace zjloc
                //      std::cout << ANSI_COLOR_YELLOW << "Low convincing result -> singular values:"
                //                << svd.singularValues().x() << ", " << svd.singularValues().y() << ", "
                //                << svd.singularValues().z() << ANSI_COLOR_RESET << std::endl;
-               return svd.singularValues().z();
+               return sigv_x > 1e-9 ? sigv_z / sigv_x : 0.0;
           }
           else
           {
@@ -1274,7 +1331,6 @@ namespace zjloc
                     map[voxel(kx, ky, kz)] = std::move(block);
                }
           }
-          addPointToPcl(points_world, point, intensity, p_frame);
      }
 
      void lidarodom_m::addPointToPcl(pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_points, const Eigen::Vector3d &point, const double &intensity, cloudFrame *p_frame)
@@ -1345,6 +1401,10 @@ namespace zjloc
 
                if (options_.enable_mmap)
                     mmap->InsertPoint(point);
+
+               // Publish each current-frame point once. Tracking-map insertion
+               // may happen in both the regular and near maps.
+               addPointToPcl(points_world, point.point, point.intensity, p_frame);
           }
 
           {
@@ -1512,7 +1572,7 @@ namespace zjloc
           }
      }
 
-     std::vector<MeasureGroup> lidarodom_m::getMeasureMents()
+     std::vector<MeasureGroup> lidarodom_m::getMeasureMents(bool draining)
      {
           std::vector<MeasureGroup> measurements;
           while (true)
@@ -1523,7 +1583,12 @@ namespace zjloc
                if (lidar_buffer_.empty())
                     return measurements;
 
-               if (imu_buffer_.back()->timestamp_ - time_curr < delay_time_)
+               if (time_buffer_.empty())
+                    return measurements;
+
+               const double next_lidar_end = time_buffer_.front().first + time_buffer_.front().second;
+               const double required_imu_time = next_lidar_end + (draining ? 0.0 : delay_time_);
+               if (imu_buffer_.back()->timestamp_ < required_imu_time)
                     return measurements;
 
                MeasureGroup meas;
@@ -1533,8 +1598,6 @@ namespace zjloc
                meas.lidar_end_time_ = meas.lidar_begin_time_ + time_buffer_.front().second;
                lidar_buffer_.pop_front();
                time_buffer_.pop_front();
-
-               time_curr = meas.lidar_end_time_;
 
                double imu_time = imu_buffer_.front()->timestamp_;
                meas.imu_.clear();
@@ -1627,18 +1690,20 @@ namespace zjloc
 
           if (imu_init_.InitSuccess())
           {
-               // 读取初始零偏，设置ESKF
                zjloc::ESKFD::Options options;
-               // 噪声由初始化器估计
-               // options.gyro_var_ = sqrt(imu_init_.GetCovGyro()[0]);
-               // options.acce_var_ = sqrt(imu_init_.GetCovAcce()[0]);
-               // options.update_bias_acce_ = false;
-               // options.update_bias_gyro_ = false;
-               eskf_.SetInitialConditions(options, imu_init_.GetInitBg(), imu_init_.GetInitBa(), imu_init_.GetGravity());
-               imu_need_init_ = false;
-               RIG_ = SO3(g2R(imu_init_.GetMeanAcc()));
+               const SO3 initial_rotation(g2R(imu_init_.GetMeanAcc()));
+               const Vec3d gravity_world = initial_rotation * imu_init_.GetGravity();
 
-               std::cout << ANSI_COLOR_GREEN_BOLD << "IMU初始化成功" << ANSI_COLOR_RESET << std::endl;
+               eskf_.SetInitialConditions(
+                   options, imu_init_.GetInitBg(), imu_init_.GetInitBa(), gravity_world);
+               eskf_.SetX(SE3(initial_rotation, Vec3d::Zero()), Vec3d::Zero());
+               eskf_.SetInitialTime(imu_init_.GetCurrentTime());
+               imu_need_init_ = false;
+               // The internal map is gravity-aligned now, so world -> map is identity.
+               RIG_ = SO3();
+
+               std::cout << ANSI_COLOR_GREEN_BOLD << "IMU initialization succeeded"
+                         << ANSI_COLOR_RESET << std::endl;
           }
      }
 

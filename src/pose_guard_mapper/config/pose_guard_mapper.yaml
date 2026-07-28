@@ -8,7 +8,7 @@ pose_guard_mapper:
     guarded_map_topic: /guarded_map
     status_topic: /pose_guard/status
     save_map_service: /pose_guard/save_map
-    save_map_path: /home/li/slam-mid360-volita/map/guarded_map.pcd
+    save_map_path: map/guarded_map.pcd
 
     map_frame: map
     base_frame: base_link
@@ -17,6 +17,8 @@ pose_guard_mapper:
     position_threshold_m: 1.0
     orientation_threshold_deg: 20.0
     reject_count_threshold: 3
+    # Enable only after both camera/base and LiDAR/base extrinsics are calibrated.
+    camera_fallback_enabled: false
 
     # Return to LiDAR only after sustained agreement.
     recovery_position_threshold_m: 0.45
@@ -27,7 +29,9 @@ pose_guard_mapper:
     max_time_diff_sec: 0.10
     require_header_time_near_now: true
     max_wall_stamp_skew_sec: 5.0
-    cloud_pose_max_age_sec: 1.0
+    max_pose_interpolation_gap_sec: 0.25
+    max_pending_cloud_wait_sec: 2.0
+    max_pending_clouds: 100
 
     # Reject clearly broken VIO poses before comparison.
     max_reasonable_translation_m: 10000.0
@@ -36,8 +40,14 @@ pose_guard_mapper:
     map_voxel_size_m: 0.10
     max_map_voxels: 2000000
     publish_every_n_clouds: 10
+    min_cloud_range_m: 0.1
+    max_cloud_range_m: 250.0
 
     # Pose of the LiDAR/base frame expressed in the camera VIO child frame.
     # Keep identity until the rigid camera-LiDAR extrinsic is measured.
     camera_child_to_lidar_base_translation: [0.0, 0.0, 0.0]
     camera_child_to_lidar_base_rpy_deg: [0.0, 0.0, 0.0]
+
+    # Pose of the LiDAR frame expressed in base_link. Match adaptive_lio's T_IL.
+    base_from_lidar_translation: [0.0, 0.0, 0.0]
+    base_from_lidar_rpy_deg: [0.0, 0.0, 0.0]

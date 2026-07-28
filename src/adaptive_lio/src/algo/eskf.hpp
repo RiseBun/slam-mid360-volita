@@ -59,6 +59,7 @@ namespace zjloc
             /// 其他配置
             bool update_bias_gyro_ = true; // 是否更新陀螺bias
             bool update_bias_acce_ = true; // 是否更新加计bias
+            bool update_gravity_ = false;  // gravity is fixed after gravity-aligned initialization
         };
 
         /**
@@ -82,6 +83,10 @@ namespace zjloc
             ba_ = init_ba;
             g_ = gravity;
             cov_ = Mat18T::Identity() * 1e-4;
+            if (!options_.update_gravity_)
+            {
+                cov_.template block<3, 3>(15, 15).setZero();
+            }
         }
 
         /// 使用IMU递推
@@ -187,7 +192,7 @@ namespace zjloc
             Q_.diagonal() << 0, 0, 0, ev2, ev2, ev2, et2, et2, et2, eg2, eg2, eg2, ea2, ea2, ea2, 0, 0, 0;
 
             // 设置里程计噪声
-            double o2 = options_.odom_var_ * options_.odom_var_;
+            double o2 = options.odom_var_ * options.odom_var_;
             odom_noise_.diagonal() << o2, o2, o2;
         }
 
@@ -209,7 +214,10 @@ namespace zjloc
                 ba_ += dx_.template block<3, 1>(12, 0);
             }
             // std::cout << "after v:" << v_.transpose() << ",ba: " << ba_.transpose() << std::endl;
-            g_ += dx_.template block<3, 1>(15, 0);
+            if (options_.update_gravity_)
+            {
+                g_ += dx_.template block<3, 1>(15, 0);
+            }
 
             ProjectCov();
             dx_.setZero();
@@ -338,7 +346,10 @@ namespace zjloc
         F.template block<3, 3>(0, 3) = Mat3T::Identity() * dt;                        // p 对 v
         F.template block<3, 3>(3, 6) = -R_.matrix() * SO3::hat(imu.acce_ - ba_) * dt; // v对theta
         F.template block<3, 3>(3, 12) = -R_.matrix() * dt;                            // v 对 ba
-        F.template block<3, 3>(3, 15) = Mat3T::Identity() * dt;                       // v 对 g
+        if (options_.update_gravity_)
+        {
+            F.template block<3, 3>(3, 15) = Mat3T::Identity() * dt;                   // v 对 g
+        }
         F.template block<3, 3>(6, 6) = SO3::exp(-(imu.gyro_ - bg_) * dt).matrix();    // theta 对 theta
         F.template block<3, 3>(6, 9) = -Mat3T::Identity() * dt;                       // theta 对 bg
 

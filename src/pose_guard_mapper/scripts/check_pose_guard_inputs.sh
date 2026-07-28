@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-source /opt/ros/humble/setup.bash
-source /home/li/livox_ws/install/setup.bash 2>/dev/null || true
-source /home/li/dp180_ws/install/setup.bash 2>/dev/null || true
-source /home/li/slam-mid360-volita/install/setup.bash 2>/dev/null || true
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+default_slam_ws="$(cd "${script_dir}/../../.." && pwd)"
+ros_distro="${ROS_DISTRO:-humble}"
+slam_ws="${SLAM_WS_PATH:-$default_slam_ws}"
+livox_ws="${LIVOX_WS_PATH:-$HOME/livox_ws}"
+dp180_ws="${DP180_WS_PATH:-$HOME/dp180_ws}"
+
+source "/opt/ros/${ros_distro}/setup.bash"
+source "${livox_ws}/install/setup.bash" 2>/dev/null || true
+source "${dp180_ws}/install/setup.bash" 2>/dev/null || true
+source "${slam_ws}/install/setup.bash" 2>/dev/null || true
 
 set -u
 
-echo "jetson_now_epoch=$(date +%s)"
+echo "host_now_epoch=$(date +%s)"
 echo "--- topics ---"
 ros2 topic list | grep -E '^(/S1|/livox|/odom|/trusted|/guarded|/pose_guard)' || true
 

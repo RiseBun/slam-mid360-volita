@@ -60,6 +60,7 @@ namespace zjloc
           double beta_constant_velocity;       // Constraint on velocity
           double beta_small_velocity;          // Constraint on the relative motion
           double beta_orientation_consistency; // Constraint on the orientation consistency
+          double min_localizability_ratio = 0.01;
 
           double thres_orientation_norm;
           double thres_translation_norm;
@@ -98,7 +99,7 @@ namespace zjloc
 
           void run();
 
-          /// Signal the processing loop to stop (drain remaining queue and exit)
+          /// Signal the processing loop to stop after all complete scans are drained.
           void requestStop() { stop_requested_.store(true); cond.notify_all(); }
 
           int getIndex() { return index_frame; }
@@ -120,7 +121,7 @@ namespace zjloc
           /// 对measures_中的点云去畸变
           void Undistort(std::vector<point3D> &points);
 
-          std::vector<MeasureGroup> getMeasureMents();
+          std::vector<MeasureGroup> getMeasureMents(bool draining = false);
 
           /// 处理同步之后的IMU和雷达数据
           void ProcessMeasurements(MeasureGroup &meas);
@@ -132,9 +133,9 @@ namespace zjloc
           cloudFrame *buildFrame(std::vector<point3D> &const_surf, state *cur_state,
                                  double timestamp_begin, double timestamp_end);
 
-          void poseEstimation(cloudFrame *p_frame);
+          bool poseEstimation(cloudFrame *p_frame);
 
-          void optimize(cloudFrame *p_frame);
+          bool optimize(cloudFrame *p_frame);
 
           void lasermap_fov_segment();
 
@@ -190,7 +191,7 @@ namespace zjloc
 
           voxelHashMap voxel_map;
           voxelHashMap voxel_map_near;  // Near-field fine-grained voxel map (sliding window)
-          MultipleResolutionVoxelMap *mmap;
+          MultipleResolutionVoxelMap *mmap = nullptr;
 
           Eigen::Matrix3d R_imu_lidar = Eigen::Matrix3d::Identity(); //   lidar 转换到 imu坐标系下
           Eigen::Vector3d t_imu_lidar = Eigen::Vector3d::Zero();     //   need init
@@ -205,7 +206,6 @@ namespace zjloc
           std::vector<NavStated> imu_states_; // ESKF预测期间的状态
           IMUPtr last_imu_ = nullptr;
 
-          double time_curr;
           double delay_time_;
           Vec3d g_{0, 0, -9.8};
 

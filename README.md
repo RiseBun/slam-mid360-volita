@@ -56,6 +56,7 @@
 | 平台 | 配置文件 | 说明 |
 |------|---------|------|
 | x86_64 (i5/i7/i9) | `mapping_m.yaml` | 默认配置，全功能 |
+| Intel NUC (x86_64) | `mapping_m.yaml` | 默认配置，建议关闭 RViz |
 | Jetson AGX Orin | `mapping_m.yaml` | 可使用默认配置 |
 | **Jetson Orin NX 16GB** | `mapping_orin_nx.yaml` | 专用优化配置 |
 | **Jetson Orin Nano 8GB** | `mapping_orin_nano.yaml` | 极限优化配置 |
@@ -332,6 +333,29 @@ common:
 ---
 
 ## 边缘设备部署
+
+### Intel NUC
+
+NUC 使用默认 `mapping_m.yaml`，不要套用 ARM/Orin 的降级参数。首次搬机后先完成构建和输入检查：
+
+```bash
+cd ~/slam-mid360-volita
+source /opt/ros/humble/setup.bash
+source ~/livox_ws/install/setup.bash
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+source install/setup.bash
+./src/adaptive_lio/bash/run_slam.sh --indoor --driver --no-rviz --map-path "$HOME/slam_maps"
+```
+
+系统启动后，在另一个已 source 工作区的终端运行输入检查：
+
+```bash
+bash ./src/pose_guard_mapper/scripts/check_pose_guard_inputs.sh
+```
+
+上电启动后保持整机静止至少 2 秒。程序只有在陀螺均值、IMU 方差和重力模长同时通过检查后才开始建图，移动中不会再误初始化。
+
+`mapping.extrinsic_T/R`、`camera_child_to_lidar_base_*` 和 `base_from_lidar_*` 必须填写实测刚体外参。当前默认单位阵只是占位值；相机外参未标定时保持 `camera_fallback_enabled: false`。
 
 ### Jetson Orin NX 16GB 配置
 
@@ -1051,9 +1075,10 @@ src/pose_guard_mapper/scripts/start_dp180_ptp_master.sh
 仲裁逻辑：
 
 - 正常情况下相信 LiDAR SLAM；
-- 当 LiDAR 与 DP180 VIO 的位姿偏差超过阈值时，切换为相信 camera；
+- 默认只比较 DP180 VIO，不允许 camera 接管；
+- 只有实测填写相机/雷达外参并显式设置 `camera_fallback_enabled: true` 后，持续偏差才会触发 camera 接管；
 - 点云仍来自 MID-360；
-- `/guarded_map` 使用当前可信位姿累计点云；
+- `/guarded_map` 按每个 Livox 点的 `offset_time` 插值可信位姿，整帧时序不完整则不写图；
 - 如果相机时间戳不接近 Jetson 当前时间，直接判定 `camera_ok=no`，避免错误融合。
 
 重新编译：

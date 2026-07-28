@@ -147,8 +147,8 @@ cleanup() {
     if [ -n "$NODE_PID" ] && kill -0 "$NODE_PID" 2>/dev/null; then
         echo "[INFO] 等待地图自动保存..."
         kill -SIGTERM "$NODE_PID" 2>/dev/null
-        # 给节点10秒时间保存地图
-        for i in $(seq 1 10); do
+        # Large maps can take well over ten seconds to flush on an NUC.
+        for i in $(seq 1 120); do
             if ! kill -0 "$NODE_PID" 2>/dev/null; then
                 break
             fi

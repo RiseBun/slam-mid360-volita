@@ -1,4 +1,5 @@
 %YAML 1.2
+---
 # Orin Nano 8GB / 低内存边缘设备 极限优化配置
 # 目标: 控制 RSS < 4GB，帧处理 < 200ms，避免 swap 导致的性能退化
 # 相比 Orin NX 配置进一步降低计算量和内存占用，牺牲部分地图密度换取实时性
@@ -9,6 +10,13 @@ preprocess:
   blind: 0.1
   sweep_cut_num: 1
   degenerate_window_num: 10
+
+imu_init:
+  duration_sec: 2.0
+  max_gyro_variance: 0.5
+  max_accel_variance: 0.6
+  max_gyro_mean_rad_s: 0.05
+  max_gravity_norm_error: 0.5
 
 common:
   imu_topic: /livox/imu
@@ -23,7 +31,8 @@ common:
   max_near_buffer_points: 1000000
 
 mapping:
-  extrinsic_est_en: true
+  # Online extrinsic estimation is not implemented; these values are fixed.
+  extrinsic_est_en: false
   extrinsic_T: [0, 0, 0]
   extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
@@ -74,7 +83,8 @@ odometry:
   sampling_rate: 1.0
   max_num_residuals: 500   # NX:800 → 500，减少 Ceres 残差块
   min_num_residuals: 20    # NX:30 → 20
-  motion_compensation: CONSTANT_VELOCITY
+  motion_compensation: CONTINUOUS
+  min_localizability_ratio: 0.01
   beta_location_consistency: 0.001
   beta_orientation_consistency: 0.1
   beta_constant_velocity: 0.001

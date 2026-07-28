@@ -1,4 +1,5 @@
 %YAML 1.2
+---
 # Adaptive-LIO 配置文件
 
 preprocess:
@@ -7,6 +8,13 @@ preprocess:
   blind: 0.1
   sweep_cut_num: 1
   degenerate_window_num: 10
+
+imu_init:
+  duration_sec: 2.0
+  max_gyro_variance: 0.5
+  max_accel_variance: 0.6
+  max_gyro_mean_rad_s: 0.05
+  max_gravity_norm_error: 0.5
 
 common:
   imu_topic: /livox/imu #/imu_raw   /gps/gtimu
@@ -26,7 +34,8 @@ common:
   dense_voxel_size: 0.0              # Merge downsample: 0=raw, 0.01=1cm, 0.02=2cm
 
 mapping:
-  extrinsic_est_en: true
+  # Online extrinsic estimation is not implemented; these values are fixed.
+  extrinsic_est_en: false
   extrinsic_T: [0, 0, 0]
   extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
@@ -75,7 +84,8 @@ odometry:
   sampling_rate: 1.5
   max_num_residuals: 1200
   min_num_residuals: 50
-  motion_compensation: CONSTANT_VELOCITY #NONE, CONSTANT_VELOCITY, ITERATIVE, CONTINUOUS
+  motion_compensation: CONTINUOUS # CT_POINT_TO_PLANE requires CONTINUOUS
+  min_localizability_ratio: 0.01
   beta_location_consistency: 0.001
   beta_orientation_consistency: 0.1
   beta_constant_velocity: 0.001

@@ -267,8 +267,16 @@ cleanup() {
     fi
     if [[ -n "$GUARD_PID" ]] && kill -0 $GUARD_PID 2>/dev/null; then
         kill -INT $GUARD_PID 2>/dev/null || true
-        sleep 1
-        kill -9 $GUARD_PID 2>/dev/null || true
+        for i in $(seq 1 30); do
+            if ! kill -0 $GUARD_PID 2>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        if kill -0 $GUARD_PID 2>/dev/null; then
+            log_warn "Pose guard did not finish saving in 30 seconds; forcing shutdown"
+            kill -9 $GUARD_PID 2>/dev/null || true
+        fi
     fi
     # 先停止录制（SIGINT 让 ros2 bag record 正常刷盘关闭）
     if [[ -n "$RECORD_PID" ]] && kill -0 $RECORD_PID 2>/dev/null; then
@@ -449,7 +457,16 @@ start_pose_guard() {
 
     log_info "启动 LiDAR/相机位姿仲裁节点..."
     mkdir -p "$WS_DIR/log"
+    local guard_map_dir="${MAP_PATH:-$PKG_DIR/map/}"
+    local require_header_time_near_now="true"
+    if [[ -n "$BAG_PATH" ]]; then
+        # Recorded header stamps are intentionally not close to the current wall clock.
+        require_header_time_near_now="false"
+    fi
+    mkdir -p "$guard_map_dir"
     ros2 launch pose_guard_mapper pose_guard_mapper.launch.py \
+        save_map_path:="${guard_map_dir%/}/guarded_map.pcd" \
+        require_header_time_near_now:="$require_header_time_near_now" \
         > "$WS_DIR/log/pose_guard_mapper.log" 2>&1 &
     GUARD_PID=$!
     sleep 2
