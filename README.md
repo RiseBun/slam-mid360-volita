@@ -189,6 +189,7 @@ cd ~/slam-mid360-volita/src/adaptive_lio/bash
 | `--orin` | 使用 Orin NX 优化配置（16GB） |
 | `--orin-nano` | 使用 Orin Nano 极限优化配置（8GB/低内存设备） |
 | `--driver` | 启动 Livox MID360 驱动（实时建图时需要） |
+| `--guard` | 启动相机位姿仲裁、相机回退和守护地图（默认关闭；使用即表示相机已完成连接、时间同步和外参标定） |
 | `--dense [VOXEL]` | Dense 模式（可选体素大小，见下文） |
 | `--record-bag [PATH]` | 录制 rosbag（可选指定保存目录，默认当前目录） |
 | `--config FILE` | 使用指定配置文件 |
@@ -1291,7 +1292,7 @@ tmux new-session -d -s dp180_bridge \
 ```bash
 tmux kill-session -t slam_guard
 tmux new-session -d -s slam_guard \
-  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map'"
+  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --guard --no-rviz --map-path /home/li/slam-mid360-volita/map'"
 ```
 
 #### 雷达连不上
