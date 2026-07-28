@@ -30,6 +30,7 @@ common:
   save_near_range: 30.0        # 约 max_distance 的 35-40%
   archive_trigger_distance: 12.0
   max_near_buffer_points: 5000000
+  near_buffer_target_points: 2500000 # Background compaction target (must be below max)
 
   dense_map_mode: false
   dense_save_segment_points: 2000000

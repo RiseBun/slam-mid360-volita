@@ -318,9 +318,21 @@ public:
             archive_trigger_distance_ = yaml["common"]["archive_trigger_distance"].as<double>();
         if (yaml["common"]["max_near_buffer_points"])
             max_near_buffer_points_ = yaml["common"]["max_near_buffer_points"].as<size_t>();
+        near_buffer_target_points_ = std::max<size_t>(1, max_near_buffer_points_ / 2);
+        if (yaml["common"]["near_buffer_target_points"])
+            near_buffer_target_points_ = yaml["common"]["near_buffer_target_points"].as<size_t>();
+        if (near_buffer_target_points_ >= max_near_buffer_points_)
+        {
+            near_buffer_target_points_ = std::max<size_t>(1, max_near_buffer_points_ / 2);
+            RCLCPP_WARN(this->get_logger(),
+                        "near_buffer_target_points must be below max_near_buffer_points; using %zu",
+                        near_buffer_target_points_);
+        }
         if (enable_save_sliding_window_)
-            RCLCPP_INFO(this->get_logger(), "Save sliding window: near_range=%.1f, archive_dist=%.1f, max_buffer=%zu",
-                        save_near_range_, archive_trigger_distance_, max_near_buffer_points_);
+            RCLCPP_INFO(this->get_logger(),
+                        "Save sliding window: near_range=%.1f, archive_dist=%.1f, max_buffer=%zu, target=%zu",
+                        save_near_range_, archive_trigger_distance_, max_near_buffer_points_,
+                        near_buffer_target_points_);
 
         // Dense map mode config (YAML + env var override)
         if (yaml["common"]["dense_map_mode"])
@@ -414,6 +426,11 @@ public:
             lio_->requestStop();
         if (process_thread_.joinable())
             process_thread_.join();
+
+        // The maintenance worker owns a swapped-out part of the near map.
+        // Rejoin it before taking the final map snapshot.
+        if (near_maintenance_thread_.joinable())
+            near_maintenance_thread_.join();
 
         // Wait for any background save/segment threads to finish
         if (save_thread_.joinable())
@@ -639,16 +656,9 @@ private:
 
                         if (enable_save_sliding_window_)
                         {
-                            // Sliding window: accumulate into near_buffer_ without downsampling
+                            // Maintenance is scheduled from the pose callback, where the
+                            // current position is available. Keep this hot path O(frame points).
                             *near_buffer_ += *cloud;
-
-                            // Memory protection: lightweight downsample if buffer exceeds limit
-                            if (near_buffer_->size() > max_near_buffer_points_)
-                            {
-                                pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
-                                if (safeVoxelDownsample(near_buffer_, filtered, 0.02f))
-                                    near_buffer_.swap(filtered);
-                            }
                         }
                         else
                         {
@@ -1370,64 +1380,161 @@ private:
     double save_near_range_ = 30.0;
     double archive_trigger_distance_ = 10.0;
     size_t max_near_buffer_points_ = 3000000;
+    size_t near_buffer_target_points_ = 1500000;
     pcl::PointCloud<pcl::PointXYZI>::Ptr near_buffer_;
     Eigen::Vector3d last_archive_position_;
     bool archive_initialized_ = false;
+    std::thread near_maintenance_thread_;
+    std::atomic<bool> near_maintenance_in_progress_{false};
 
-    // Archive near_buffer_: move far-away points into global_map_ with downsampling
+    float compactNearCloud(
+        pcl::PointCloud<pcl::PointXYZI>::Ptr input,
+        pcl::PointCloud<pcl::PointXYZI>::Ptr &output)
+    {
+        float leaf_size = map_voxel_size_;
+        pcl::PointCloud<pcl::PointXYZI>::Ptr source = input;
+
+        while (source && !source->empty())
+        {
+            pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
+            if (!safeVoxelDownsample(source, filtered, leaf_size))
+                break;
+
+            output = filtered;
+            if (filtered->size() <= near_buffer_target_points_ || leaf_size >= 1.0f)
+                return leaf_size;
+
+            source = filtered;
+            leaf_size = std::min(1.0f, leaf_size * 1.5f);
+        }
+
+        output = input;
+        return leaf_size;
+    }
+
+    // Swap the active buffer in O(1), then compact and archive it off the LIO thread.
     void archiveNearBuffer(const Eigen::Vector3d &current_pos)
     {
         if (!enable_save_sliding_window_)
             return;
 
+        bool capacity_trigger = false;
+        {
+            std::lock_guard<std::mutex> lock(map_mutex_);
+            capacity_trigger = near_buffer_ && near_buffer_->size() >= max_near_buffer_points_;
+        }
+
         if (!archive_initialized_)
         {
             last_archive_position_ = current_pos;
             archive_initialized_ = true;
-            return;
+            if (!capacity_trigger)
+                return;
         }
 
-        if ((current_pos - last_archive_position_).norm() < archive_trigger_distance_)
+        const bool distance_trigger =
+            (current_pos - last_archive_position_).norm() >= archive_trigger_distance_;
+        if (!distance_trigger && !capacity_trigger)
             return;
 
-        last_archive_position_ = current_pos;
-
-        std::lock_guard<std::mutex> lock(map_mutex_);
-        if (!near_buffer_ || near_buffer_->empty())
+        if (near_maintenance_in_progress_.load())
             return;
 
-        double sq_range = save_near_range_ * save_near_range_;
-        pcl::PointCloud<pcl::PointXYZI>::Ptr keep(new pcl::PointCloud<pcl::PointXYZI>());
-        pcl::PointCloud<pcl::PointXYZI>::Ptr archive(new pcl::PointCloud<pcl::PointXYZI>());
+        // A completed std::thread remains joinable. This join cannot block while
+        // in_progress is false and is required before assigning a new worker.
+        if (near_maintenance_thread_.joinable())
+            near_maintenance_thread_.join();
 
-        keep->reserve(near_buffer_->size());
-        archive->reserve(near_buffer_->size() / 4);
-
-        for (const auto &pt : near_buffer_->points)
+        pcl::PointCloud<pcl::PointXYZI>::Ptr work(new pcl::PointCloud<pcl::PointXYZI>());
         {
-            double dx = pt.x - current_pos.x();
-            double dy = pt.y - current_pos.y();
-            double dz = pt.z - current_pos.z();
-            if (dx * dx + dy * dy + dz * dz <= sq_range)
-                keep->points.push_back(pt);
-            else
-                archive->points.push_back(pt);
+            std::lock_guard<std::mutex> lock(map_mutex_);
+            if (!near_buffer_ || near_buffer_->empty())
+                return;
+            near_buffer_.swap(work);
         }
 
-        if (!archive->empty())
-        {
-            archive->width = archive->size();
-            archive->height = 1;
-            pcl::PointCloud<pcl::PointXYZI>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZI>());
-            if (safeVoxelDownsample(archive, filtered, map_voxel_size_))
-                *global_map_ += *filtered;
-            else
-                *global_map_ += *archive;
-        }
+        if (distance_trigger)
+            last_archive_position_ = current_pos;
 
-        keep->width = keep->size();
-        keep->height = 1;
-        near_buffer_.swap(keep);
+        near_maintenance_in_progress_ = true;
+        const char *trigger = capacity_trigger ? "capacity" : "distance";
+        RCLCPP_INFO(this->get_logger(),
+                    "[SaveWindow] Background maintenance started: %zu points, trigger=%s",
+                    work->size(), trigger);
+
+        near_maintenance_thread_ = std::thread(
+            [this, work, current_pos, trigger]() mutable
+            {
+                try
+                {
+                    const double sq_range = save_near_range_ * save_near_range_;
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr keep(new pcl::PointCloud<pcl::PointXYZI>());
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr archive(new pcl::PointCloud<pcl::PointXYZI>());
+                    keep->reserve(work->size());
+                    archive->reserve(work->size() / 4);
+
+                    for (const auto &pt : work->points)
+                    {
+                        const double dx = pt.x - current_pos.x();
+                        const double dy = pt.y - current_pos.y();
+                        const double dz = pt.z - current_pos.z();
+                        if (dx * dx + dy * dy + dz * dz <= sq_range)
+                            keep->points.push_back(pt);
+                        else
+                            archive->points.push_back(pt);
+                    }
+
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr compacted_keep;
+                    const float effective_leaf = compactNearCloud(keep, compacted_keep);
+
+                    pcl::PointCloud<pcl::PointXYZI>::Ptr compacted_archive(new pcl::PointCloud<pcl::PointXYZI>());
+                    if (!archive->empty() &&
+                        !safeVoxelDownsample(archive, compacted_archive, map_voxel_size_))
+                    {
+                        compacted_archive = archive;
+                    }
+
+                    size_t active_points = 0;
+                    size_t near_points = 0;
+                    size_t global_points = 0;
+                    {
+                        std::lock_guard<std::mutex> lock(map_mutex_);
+                        active_points = near_buffer_->size();
+
+                        // Append the small active buffer to the compacted cloud and
+                        // swap, avoiding a reallocation of the active hot-path buffer.
+                        if (compacted_keep && !compacted_keep->empty())
+                        {
+                            compacted_keep->reserve(compacted_keep->size() + near_buffer_->size());
+                            *compacted_keep += *near_buffer_;
+                            near_buffer_.swap(compacted_keep);
+                        }
+
+                        if (compacted_archive && !compacted_archive->empty())
+                            *global_map_ += *compacted_archive;
+
+                        near_points = near_buffer_->size();
+                        global_points = global_map_->size();
+                    }
+
+                    RCLCPP_INFO(this->get_logger(),
+                                "[SaveWindow] Background maintenance complete: input=%zu, active=%zu, near=%zu, archived=%zu, global=%zu, voxel=%.3f, trigger=%s",
+                                work->size(), active_points, near_points,
+                                compacted_archive ? compacted_archive->size() : 0,
+                                global_points, effective_leaf, trigger);
+                }
+                catch (const std::exception &e)
+                {
+                    RCLCPP_ERROR(this->get_logger(),
+                                 "[SaveWindow] Background maintenance failed: %s", e.what());
+                    std::lock_guard<std::mutex> lock(map_mutex_);
+                    work->reserve(work->size() + near_buffer_->size());
+                    *work += *near_buffer_;
+                    near_buffer_.swap(work);
+                }
+
+                near_maintenance_in_progress_ = false;
+            });
     }
 };
 

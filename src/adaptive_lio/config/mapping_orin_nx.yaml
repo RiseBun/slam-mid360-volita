@@ -29,6 +29,7 @@ common:
   save_near_range: 25.0
   archive_trigger_distance: 10.0
   max_near_buffer_points: 2000000
+  near_buffer_target_points: 1000000 # Background compaction target (hysteresis)
 
 mapping:
   # Online extrinsic estimation is not implemented; these values are fixed.

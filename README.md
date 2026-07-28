@@ -501,11 +501,23 @@ common:
   map_save_path: ""      # 空=默认路径，或指定绝对路径
   map_voxel_size: 0.05   # 稀疏模式降采样体素大小 (m)
 
+  # 稀疏地图保存滑动窗口
+  enable_save_sliding_window: true
+  save_near_range: 30.0                # 内存中保留当前位置周围的半径 (m)
+  archive_trigger_distance: 10.0       # 每移动该距离检查并归档远场点
+  max_near_buffer_points: 5000000      # 后台整理触发上限
+  near_buffer_target_points: 2500000   # 整理后的目标，必须小于上限
+
   # Dense 模式 (--dense 或 dense_map_mode: true)
   dense_map_mode: false
   dense_save_segment_points: 2000000   # 每段点数
   dense_voxel_size: 0.0                # 合并降采样 (0=不降采样)
 ```
+
+稀疏模式达到 `max_near_buffer_points` 后会交换活动缓冲区，在后台按
+`map_voxel_size` 整理近场点，并把窗口外的点归档。SLAM 处理线程不会再同步扫描
+整个缓冲区。`near_buffer_target_points` 提供回滞，防止整理后下一帧立即再次触发。
+不要通过删除上限来换取速度；这会使内存无界增长。
 
 ### 场景调参建议
 

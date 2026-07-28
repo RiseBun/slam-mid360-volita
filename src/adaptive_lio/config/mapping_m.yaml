@@ -28,6 +28,7 @@ common:
   save_near_range: 30.0          # Near-field range for saved map (m)
   archive_trigger_distance: 10.0 # Archive far points every N meters moved
   max_near_buffer_points: 5000000
+  near_buffer_target_points: 2500000 # Background compaction target (must be below max)
   # Dense map mode: save full-resolution PCD (no downsampling on export branch)
   # SLAM tracking map stays lightweight; only the save/export changes.
   dense_map_mode: false              # Set to true for full-resolution PCD output
