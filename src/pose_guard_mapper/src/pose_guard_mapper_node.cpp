@@ -174,7 +174,6 @@ private:
       declare_parameter<double>("recovery_orientation_threshold_deg", 8.0) * kPi / 180.0;
     reject_count_threshold_ = declare_parameter<int>("reject_count_threshold", 3);
     recover_count_threshold_ = declare_parameter<int>("recover_count_threshold", 20);
-    camera_fallback_enabled_ = declare_parameter<bool>("camera_fallback_enabled", false);
 
     max_time_diff_sec_ = declare_parameter<double>("max_time_diff_sec", 0.10);
     require_header_time_near_now_ =
@@ -437,12 +436,6 @@ private:
   void updateSourceMode(
     bool camera_ok, bool comparable, double position_error, double orientation_error)
   {
-    if (!camera_fallback_enabled_) {
-      source_mode_ = SourceMode::Lidar;
-      reject_count_ = 0;
-      recover_count_ = 0;
-      return;
-    }
     if (!camera_ok) {
       if (source_mode_ == SourceMode::Camera) {
         RCLCPP_WARN(get_logger(), "Camera fallback lost; returning to LiDAR odometry.");
@@ -807,7 +800,6 @@ private:
   double recovery_orientation_threshold_rad_ = 8.0 * kPi / 180.0;
   int reject_count_threshold_ = 3;
   int recover_count_threshold_ = 20;
-  bool camera_fallback_enabled_ = false;
   double max_time_diff_sec_ = 0.10;
   bool require_header_time_near_now_ = true;
   double max_wall_stamp_skew_sec_ = 5.0;

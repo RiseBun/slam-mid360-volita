@@ -347,7 +347,14 @@ source install/setup.bash
 ./src/adaptive_lio/bash/run_slam.sh --indoor --driver --no-rviz --map-path "$HOME/slam_maps"
 ```
 
-系统启动后，在另一个已 source 工作区的终端运行输入检查：
+上述命令默认是纯 LiDAR 模式，不启动相机订阅、位姿仲裁器或守护地图。
+只有已安装并标定相机时才增加 `--guard`：
+
+```bash
+./src/adaptive_lio/bash/run_slam.sh --indoor --driver --guard --no-rviz --map-path "$HOME/slam_maps"
+```
+
+启用 `--guard` 后，在另一个已 source 工作区的终端运行输入检查：
 
 ```bash
 bash ./src/pose_guard_mapper/scripts/check_pose_guard_inputs.sh
@@ -355,7 +362,7 @@ bash ./src/pose_guard_mapper/scripts/check_pose_guard_inputs.sh
 
 上电启动后保持整机静止至少 2 秒。程序只有在陀螺均值、IMU 方差和重力模长同时通过检查后才开始建图，移动中不会再误初始化。
 
-`mapping.extrinsic_T/R`、`camera_child_to_lidar_base_*` 和 `base_from_lidar_*` 必须填写实测刚体外参。当前默认单位阵只是占位值；相机外参未标定时保持 `camera_fallback_enabled: false`。
+`mapping.extrinsic_T/R`、`camera_child_to_lidar_base_*` 和 `base_from_lidar_*` 必须填写实测刚体外参。当前默认单位阵只是占位值；相机外参未标定时不要使用 `--guard`。
 
 ### Jetson Orin NX 16GB 配置
 
@@ -828,7 +835,7 @@ ssh linaro@10.42.0.64
 
 ### 3. 为什么必须先修 PTP
 
-`pose_guard_mapper` 默认启用严格时间安全检查：
+显式使用 `--guard` 启动 `pose_guard_mapper` 后，节点内部默认启用严格时间安全检查：
 
 ```yaml
 require_header_time_near_now: true
@@ -1076,8 +1083,8 @@ src/pose_guard_mapper/scripts/start_dp180_ptp_master.sh
 仲裁逻辑：
 
 - 正常情况下相信 LiDAR SLAM；
-- 默认只比较 DP180 VIO，不允许 camera 接管；
-- 只有实测填写相机/雷达外参并显式设置 `camera_fallback_enabled: true` 后，持续偏差才会触发 camera 接管；
+- 只有显式传入 `--guard` 才启动本节点；使用该参数即表示相机已连接、完成时间同步并填写实测外参；
+- LiDAR 与相机持续偏差超过阈值后，camera 自动接管；
 - 点云仍来自 MID-360；
 - `/guarded_map` 按每个 Livox 点的 `offset_time` 插值可信位姿，整帧时序不完整则不写图；
 - 如果相机时间戳不接近 Jetson 当前时间，直接判定 `camera_ok=no`，避免错误融合。
@@ -1109,7 +1116,7 @@ source /home/li/dp180_ws/install/setup.bash
 source /home/li/slam-mid360-volita/install/setup.bash
 ```
 
-默认启用 `pose_guard_mapper`，并在终端打印当前相信谁：
+默认不启动相机和 `pose_guard_mapper`，只运行 LiDAR SLAM。显式传入 `--guard` 后才启动仲裁器，并在终端打印当前相信谁：
 
 ```text
 [POSE_GUARD] 当前相信: LIDAR
@@ -1120,14 +1127,14 @@ source /home/li/slam-mid360-volita/install/setup.bash
 
 ```bash
 cd /home/li/slam-mid360-volita
-./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map
+./src/adaptive_lio/bash/run_slam.sh --orin --driver --guard --no-rviz --map-path /home/li/slam-mid360-volita/map
 ```
 
 后台启动：
 
 ```bash
 tmux new-session -d -s slam_guard \
-  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map'"
+  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --guard --no-rviz --map-path /home/li/slam-mid360-volita/map'"
 ```
 
 查看：
@@ -1139,7 +1146,7 @@ tmux attach -t slam_guard
 只启动原雷达 SLAM、不启用仲裁：
 
 ```bash
-./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --no-guard
+./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz
 ```
 
 ### 10. 推荐完整启动顺序
@@ -1183,7 +1190,7 @@ tmux new-session -d -s dp180_bridge \
 
 # 5. 启动 MID-360 雷达 SLAM + 位姿仲裁
 tmux new-session -d -s slam_guard \
-  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --no-rviz --map-path /home/li/slam-mid360-volita/map'"
+  "bash -lc 'cd /home/li/slam-mid360-volita && ./src/adaptive_lio/bash/run_slam.sh --orin --driver --guard --no-rviz --map-path /home/li/slam-mid360-volita/map'"
 ```
 
 ### 11. 运行中验证

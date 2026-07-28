@@ -3,11 +3,13 @@
 ROS2 node for validating LiDAR odometry against Vilota camera VIO and building a
 time-consistent fallback map.
 
-Default behavior:
+The main SLAM launcher does not start this package by default. Passing `--guard`
+means a camera is installed, time-synchronized, and extrinsically calibrated.
+When this node is running:
 
 - `/trusted_odom` follows LiDAR odometry from `/odom`.
 - Camera VIO is compared only when its timestamp and pose are valid.
-- Camera takeover is disabled until the camera-to-LiDAR extrinsic is calibrated.
+- Camera VIO takes over after sustained disagreement with LiDAR odometry.
 - Every Livox point is transformed at `header.stamp + offset_time`; a scan is
   committed only when trusted poses cover its complete time range.
 - The guarded PCD is saved by `/pose_guard/save_map` and again during clean shutdown.
@@ -28,8 +30,8 @@ Recorded bags retain historical header timestamps. Use
 `require_header_time_near_now:=false` for manual bag playback; `run_slam.sh
 --bag ...` sets this automatically.
 
-Do not enable `camera_fallback_enabled` while either
-`camera_child_to_lidar_base_*` or `base_from_lidar_*` is still a placeholder.
+Do not start the guard while either `camera_child_to_lidar_base_*` or
+`base_from_lidar_*` is still a placeholder.
 
 Save manually:
 
